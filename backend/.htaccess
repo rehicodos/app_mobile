@@ -1,0 +1,8 @@
+# Autorise tous les accès (pour développement uniquement !)
+<RequireAll>
+    Require all granted
+</RequireAll>
+
+# Active les URL clean si besoin (non obligatoire ici)
+RewriteEngine On
+Options +FollowSymLinks
