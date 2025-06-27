@@ -28,9 +28,20 @@
     // 1. Gestion des requêtes GET (pour la liste)
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         $action = $_GET['action'] ?? null;
-        if ($action === 'list_ov') {
+
+        if ($action === 'pwds') {
+            getPwds($conn);
+        } 
+        else if ($action === 'list_ov') {
             listWorkers($conn);
-        } else {
+        } 
+        else if ($action === 'list_projets') {
+            listProjets($conn);
+        }
+        else if (substr($action, 0, 15) === 'list_quinzaines') {
+            listQuinzaines($conn, $action);
+        }
+        else {
             echo json_encode(["success" => false, "message" => "Traitement ... Invalide !"]);
         }
         exit;
@@ -50,6 +61,18 @@
     switch ($action) {
         case "login":
             loginUser($conn, $data);
+            break;
+        case "new_projet":
+            createProjet($conn, $data);
+            break;
+        case "edit_projet":
+            updateProjet($conn, $data);
+            break;
+        case "new_quinzaine":
+            createQuinzaine($conn, $data);
+            break;
+        case "update_quinzaine":
+            updateQuinzaine($conn, $data);
             break;
         case "create_new_ov":
             createWorker($conn, $data);
@@ -101,6 +124,17 @@
 
     //     $stmt->close();
     // }
+
+    function getPwds($conn) {
+        $result = $conn->query("SELECT pwd_chef_ch, pwd_adm, pwd_super_adm FROM uses_compt WHERE id=1");
+
+        $pwds = $result->fetch_assoc();
+        echo json_encode($pwds);
+
+        // $conn->close();
+    }
+
+    // Gestion Login
     function loginUser($conn, $data) {
 
         if (empty($data['company']) || empty($data['pwdae'])) {
@@ -224,6 +258,279 @@
 
     }
 
+    // Gestion Projet
+    function createProjet($conn, $data) {
+
+        if (!$data) {
+            echo json_encode(["success" => false, "message" => "JSON invalide ou vide"]);
+            exit;
+        }
+    
+        // Extraction et validation des champs
+        // $name = $conn->real_escape_string($data['nom'] ?? '');
+        // $client = $conn->real_escape_string($data['client'] ?? '');
+        // $date_ = $conn->real_escape_string($data['date'] ?? '');
+        // $ttal = $conn->real_escape_string($data['ttal'] ?? '');
+        // $statut = $conn->real_escape_string($data['statut'] ?? '');
+
+        $name = $data['nom'] ?? '';
+        $bdg_mo = $data['bdgmo'] ?? '';
+        $client = $data['client'] ?? '';
+        $date_ = $data['date'] ?? '';
+        $ttal = $data['ttal'] ?? '';
+        $statut = $data['statut'] ?? '';
+    
+        if (!$name || !$client) {
+            echo json_encode(["success" => false, "message" => "Champs requis manquants"]);
+            exit;
+        }
+
+        // verification avec prepare
+        $db_verify = $conn->prepare("SELECT nom_projet FROM tab_projet WHERE nom_projet = ?");
+        $db_verify->bind_param("s", $name);
+        $db_verify->execute();
+
+        $result_v = $db_verify->get_result();
+        if ($result_v->num_rows != 0) {
+            echo json_encode(["success" => false, "message" => "Ce projet existe deja, créez un autre ou changez le nom du nouveau projet !"]);
+            $db_verify->close();
+            exit;
+        }
+    
+        
+        $stmt = $conn->prepare("INSERT INTO tab_projet (nom_projet, bdg_mo, client, date_create, ttal, statut) VALUES (?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param("ssssss", $name, $bdg_mo, $client, $date_, $ttal, $statut);
+    
+        // ✅ Exécution
+        if ($stmt->execute()) {
+            echo json_encode(["success" => true, "message" => "Projet enregistré !"]);
+        } else {
+            echo json_encode(["success" => false, "message" => "Erreur d'enregistrement"]);
+        }
+    
+        $stmt->close();
+        $db_verify->close();
+    }
+    function listProjets($conn) {
+
+        $result = $conn->query("SELECT * FROM tab_projet ORDER BY nom_projet ASC");
+        $projets = [];
+        while ($row = $result->fetch_assoc()) {
+            $projets[] = $row;
+        }
+        echo json_encode($projets);
+    }
+    function updateProjet($conn, $data) {
+
+        if (!isset($data['nom'], $data['client'])) {
+            echo json_encode(["success" => false, "message" => "Données manquantes pour update"]);
+            return;
+        }
+        $id = intval($data['id']);
+        // $name = $conn->real_escape_string($data['nom']);
+        // $client = $conn->real_escape_string($data['client']);
+        $name = $data['nom'] ?? '';
+        $bdg_mo = $data['bdgmo'] ?? '';
+        $client = $data['client'] ?? '';
+
+        // verification avec prepare
+        $db_verify = $conn->prepare("SELECT nom_projet FROM tab_projet WHERE nom_projet = ?");
+        $db_verify->bind_param("s", $name);
+        $db_verify->execute();
+
+        $result_v = $db_verify->get_result();
+        if ($result_v->num_rows > 1) {
+            echo json_encode(["success" => false, "message" => "Ce projet existe deja, créez un autre ou changez le nom du nouveau projet !"]);
+            $db_verify->close();
+            exit;
+        }
+       
+        $stmt = $conn->prepare("UPDATE tab_projet SET nom_projet=?, bdg_mo=?, client=? WHERE id=? ");
+        $stmt->bind_param("sssi", $name, $bdg_mo, $client, $id);
+
+        if ($stmt->execute()) {
+            echo json_encode(["success" => true, "message" => "Modification effectuée !"]);
+        } else {
+            echo json_encode(["success" => false, "message" => "Échec modification !"]);
+        }
+
+        $stmt->close();
+        $db_verify->close();
+    }
+
+    // Gestion Quinzaine
+    function createQuinzaine($conn, $data) {
+
+        if (!$data) {
+            echo json_encode(["success" => false, "message" => "JSON invalide ou vide"]);
+            exit;
+        }
+
+        $id_projet = $data['idprojet'] ?? '';
+        $periode = $data['session'] ?? '';
+        $debut = $data['debut'] ?? '';
+        $fin = $data['fin'] ?? '';
+        $date_ = $data['date'] ?? '';
+        $statut = $data['statut'] ?? '';
+
+        $sql_verifyQ = $conn->query("SELECT id, fin FROM tab_quinzaine WHERE id_projet = $id_projet ORDER BY id DESC LIMIT 1");
+        $verifyDate = $sql_verifyQ->fetch_assoc();
+
+        if ($sql_verifyQ->num_rows > 0) {
+
+            // Convertir les dates envoyées en DateTime
+            $nouvelleDebut = DateTime::createFromFormat('d-m-Y', $debut);
+
+            // Récupère la date de fin de la dernière session
+            $ancienFin   = DateTime::createFromFormat('d-m-Y', $verifyDate['fin']);
+
+            $aujourdhui = new DateTime();
+
+            // Différence entre aujourd'hui et la date de fin
+            $diffJours = $aujourdhui->diff($ancienFin)->days;
+            $estFuture = $ancienFin > $aujourdhui;
+
+            // Vérifie si on est à 2 jours ou moins de la fin
+            // if ($estFuture && $diffJours > 2) {
+            if ($diffJours > 3) {
+                echo json_encode([
+                    "success" => false,
+                    "message" => "Vous ne pouvez créer une nouvelle session que 3 jours avant la fin de la session actuelle.",
+                ]);
+                exit;
+            }
+
+            // Comparaison
+            if ($nouvelleDebut < $ancienFin) {
+                echo json_encode([
+                    "success" => false, "message" => "La date de début de la nouvelle Session doit être postérieure ou égale à la date de fin du Session en cours !"]);
+                exit;
+            }
+        }
+    
+        if (!$periode || !$debut || !$fin || !$date_ || !$statut || !$id_projet) {
+            echo json_encode(["success" => false, "message" => "Champs requis manquants"]);
+            exit;
+        }
+
+        // verification avec prepare
+        $db_verify = $conn->prepare("SELECT periode, debut, fin, id_projet FROM tab_quinzaine WHERE periode = ? AND debut = ? AND fin = ? AND id_projet = ? ");
+        $db_verify->bind_param("ssss", $periode, $debut, $fin, $id_projet);
+        $db_verify->execute();
+
+        $result_v = $db_verify->get_result();
+        if ($result_v->num_rows != 0) {
+            echo json_encode(["success" => false, "message" => "Cette période a été deja créer !"]);
+            $db_verify->close();
+            exit;
+        }
+    
+        
+        $stmt = $conn->prepare("INSERT INTO tab_quinzaine (id_projet, periode, debut, fin, date_create, statut) VALUES (?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param("ssssss",$id_projet, $periode, $debut, $fin, $date_, $statut);
+    
+        // ✅ Exécution
+        if ($stmt->execute()) {
+            echo json_encode(["success" => true, "message" => "Session enregistrée !"]);
+        } else {
+            echo json_encode(["success" => false, "message" => "Erreur d'enregistrement"]);
+        }
+    
+        $stmt->close();
+        $db_verify->close();
+    }
+    function listQuinzaines($conn, $action) {
+
+        $id = substr($action, 15);
+        $sql = $conn->query("SELECT * FROM tab_quinzaine WHERE id_projet = $id ORDER BY id DESC");
+        $quinzaines = [];
+
+        $nombre_total = $sql->num_rows;
+        $q_run = $sql->num_rows;
+
+        while ($row = $sql->fetch_assoc()) {
+
+            // Nouvel élément, initialisation des valeurs
+
+            if ( $q_run == $nombre_total) {
+                $quinzaines[] = [
+                    "id" => $row["id"],
+                    "id_projet" => $row["id_projet"],
+                    "periode" => $row["periode"],
+                    "debut" => $row["debut"],
+                    "fin" => $row["fin"],
+                    "date_create" => $row["date_create"],
+                    "statut" => $row["statut"],
+                    "ttal" => 656523,
+                    "nber" => $nombre_total,
+                    "qRun" => "oui"
+                ];
+            }
+            else {
+                $quinzaines[] = [
+                    "id" => $row["id"],
+                    "id_projet" => $row["id_projet"],
+                    "periode" => $row["periode"],
+                    "debut" => $row["debut"],
+                    "fin" => $row["fin"],
+                    "date_create" => $row["date_create"],
+                    "statut" => $row["statut"],
+                    "ttal" => 656523,
+                    "nber" => $nombre_total,
+                    "qRun" => "non"
+                ];
+            }
+
+            $nombre_total -= 1;
+            // $projets[] = $row;
+        }
+        echo json_encode($quinzaines);
+    }
+    function updateQuinzaine($conn, $data) {
+
+        if (!$data) {
+            echo json_encode(["success" => false, "message" => "JSON invalide ou vide"]);
+            exit;
+        }
+
+        // $id = $data['id'] ?? '';
+        $id = intval($data['id']);
+        $id_projet = $data['idprojet'] ?? '';
+        $periode = $data['periode'] ?? '';
+        $debut = $data['debut'] ?? '';
+        $fin = $data['fin'] ?? '';
+
+    
+        if (!$periode || !$debut || !$fin) {
+            echo json_encode(["success" => false, "message" => "Champs requis manquants"]);
+            exit;
+        }
+
+        // verification avec prepare
+        $db_verify = $conn->prepare("SELECT periode, debut, fin, id_projet FROM tab_quinzaine WHERE periode = ? AND debut = ? AND fin = ? AND id_projet = ? ");
+        $db_verify->bind_param("ssss", $periode, $debut, $fin, $id_projet);
+        $db_verify->execute();
+
+        $result_v = $db_verify->get_result();
+        if ($result_v->num_rows != 0) {
+            echo json_encode(["success" => false, "message" => "Cette période a été deja créer !"]);
+            $db_verify->close();
+            exit;
+        }
+    
+        $stmt = $conn->prepare("UPDATE tab_quinzaine SET periode=?, debut=?, fin=? WHERE id=? AND id_projet=? ");
+        $stmt->bind_param("sssis",$periode, $debut, $fin, $id, $id_projet);
+    
+        // ✅ Exécution
+        if ($stmt->execute()) {
+            echo json_encode(["success" => true, "message" => "Session modicifiée !"]);
+        } else {
+            echo json_encode(["success" => false, "message" => "Erreur de modification !"]);
+        }
+    
+        $stmt->close();
+        $db_verify->close();
+    }
 
 
     function createWorker($conn, $data) {
@@ -270,6 +577,7 @@
         $stmt->close();
         // $conn->close();
     }
+
     function listWorkers($conn) {
         $result = $conn->query("SELECT * FROM ch_ouvriers ORDER BY nom ASC");
 
