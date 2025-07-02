@@ -32,14 +32,30 @@
         if ($action === 'pwds') {
             getPwds($conn);
         } 
-        else if ($action === 'list_ov') {
-            listWorkers($conn);
-        } 
         else if ($action === 'list_projets') {
             listProjets($conn);
         }
-        else if (substr($action, 0, 15) === 'list_quinzaines') {
-            listQuinzaines($conn, $action);
+        else if ($action === 'list_ov') {
+            $id = $_GET['id'] ?? '';
+            listWorkersProjet($conn, $id);
+        } 
+        else if ($action === 'list_quinzaines') {
+            $id = $_GET['id'] ?? '';
+            listQuinzaines($conn, $id);
+        }
+        else if ($action === 'list_ovquinzaine') {
+            $id = $_GET['id'] ?? '';
+            listWorkersQuinzaine($conn, $id);
+        }
+        else if ($action === 'list_ovPointage') {
+            $id = $_GET['id'] ?? '';
+            $idp = $_GET['idp'] ?? '';
+            $dateNow = $_GET['dateNow'] ?? '';
+            listWorkersPointage($conn, $id, $idp, $dateNow);
+        }
+        else if ($action === 'histo_pointage_par_jour') {
+            $idQ = intval($_GET['idQ']);
+            histoPointage($conn, $idQ);
         }
         else {
             echo json_encode(["success" => false, "message" => "Traitement ... Invalide !"]);
@@ -74,8 +90,11 @@
         case "update_quinzaine":
             updateQuinzaine($conn, $data);
             break;
-        case "create_new_ov":
-            createWorker($conn, $data);
+        case "create_new_ov_pageQ":
+            createWorkerDepuisQuinz($conn, $data);
+            break;
+        case "pointage_worker":
+            pointageOuvrier($conn, $data);
             break;
         case "demande_mdp":
             demandePwd($conn, $data);
@@ -371,7 +390,7 @@
         $debut = $data['debut'] ?? '';
         $fin = $data['fin'] ?? '';
         $date_ = $data['date'] ?? '';
-        $statut = $data['statut'] ?? '';
+        // $statut = $data['statut'] ?? '';
 
         $sql_verifyQ = $conn->query("SELECT id, fin FROM tab_quinzaine WHERE id_projet = $id_projet ORDER BY id DESC LIMIT 1");
         $verifyDate = $sql_verifyQ->fetch_assoc();
@@ -408,7 +427,7 @@
             }
         }
     
-        if (!$periode || !$debut || !$fin || !$date_ || !$statut || !$id_projet) {
+        if (!$periode || !$debut || !$fin || !$date_ || !$id_projet) {
             echo json_encode(["success" => false, "message" => "Champs requis manquants"]);
             exit;
         }
@@ -426,8 +445,8 @@
         }
     
         
-        $stmt = $conn->prepare("INSERT INTO tab_quinzaine (id_projet, periode, debut, fin, date_create, statut) VALUES (?, ?, ?, ?, ?, ?)");
-        $stmt->bind_param("ssssss",$id_projet, $periode, $debut, $fin, $date_, $statut);
+        $stmt = $conn->prepare("INSERT INTO tab_quinzaine (id_projet, periode, debut, fin, date_create) VALUES (?, ?, ?, ?, ?)");
+        $stmt->bind_param("sssss",$id_projet, $periode, $debut, $fin, $date_);
     
         // ✅ Exécution
         if ($stmt->execute()) {
@@ -439,9 +458,8 @@
         $stmt->close();
         $db_verify->close();
     }
-    function listQuinzaines($conn, $action) {
+    function listQuinzaines($conn, $id) {
 
-        $id = substr($action, 15);
         $sql = $conn->query("SELECT * FROM tab_quinzaine WHERE id_projet = $id ORDER BY id DESC");
         $quinzaines = [];
 
@@ -451,6 +469,9 @@
         while ($row = $sql->fetch_assoc()) {
 
             // Nouvel élément, initialisation des valeurs
+            $idQ = $row["id"];
+            $mo = $conn->query("SELECT SUM(prix_jr * ttal_jr) AS ttalMo FROM tab_ov_quinzaine WHERE id_quinzaine = '$idQ' ");
+            $moTTal = $mo->fetch_assoc();
 
             if ( $q_run == $nombre_total) {
                 $quinzaines[] = [
@@ -460,8 +481,7 @@
                     "debut" => $row["debut"],
                     "fin" => $row["fin"],
                     "date_create" => $row["date_create"],
-                    "statut" => $row["statut"],
-                    "ttal" => 656523,
+                    "ttal" => strval($moTTal['ttalMo']),
                     "nber" => $nombre_total,
                     "qRun" => "oui"
                 ];
@@ -474,8 +494,7 @@
                     "debut" => $row["debut"],
                     "fin" => $row["fin"],
                     "date_create" => $row["date_create"],
-                    "statut" => $row["statut"],
-                    "ttal" => 656523,
+                    "ttal" => strval($moTTal['ttalMo']),
                     "nber" => $nombre_total,
                     "qRun" => "non"
                 ];
@@ -532,8 +551,113 @@
         $db_verify->close();
     }
 
+    // Ouvrier 
+    function listWorkersQuinzaine($conn, $id) {
+        
+        $sql = $conn->query("SELECT * FROM tab_ov_quinzaine WHERE id_quinzaine = $id ORDER BY nom ASC");
+        $ouvriersQ = [];
+        while ($row = $sql->fetch_assoc()) {
+            $row['photo_base64'] = base64_encode($row['photo']);
+            unset($row['photo']);
+            $ouvriersQ[] = $row;
+        }
+        echo json_encode($ouvriersQ);
 
-    function createWorker($conn, $data) {
+    }
+    function listWorkersPointage($conn, $id, $idp, $dateNow) {
+    
+        $sql = $conn->query("SELECT * FROM tab_ov_quinzaine WHERE id_quinzaine = '$id' AND id_projet = '$idp' AND jr_pointage != '$dateNow' ORDER BY nom ASC");
+        $ouvriersPointage = [];
+        while ($row = $sql->fetch_assoc()) {
+            $row['photo_base64'] = base64_encode($row['photo']);
+            unset($row['photo']);
+            $ouvriersPointage[] = $row;
+        }
+        echo json_encode($ouvriersPointage);
+
+    }
+    function pointageOuvrier($conn, $data) {
+
+        if (!$data) {
+            echo json_encode(["success" => false, "message" => "JSON invalide ou vide"]);
+            exit;
+        }
+
+        $id = intval($data['id_worker']);
+        $getDiffDay = $data['getDiffDay'] ?? '';
+
+        date_default_timezone_set('Africa/Abidjan');
+        $dateHeurActuelle = date("d-m-Y");
+
+        // reccupe ttalJr
+        $sql_ttal_jr = $conn->query("SELECT id_projet, id_quinzaine, ttal_jr FROM tab_ov_quinzaine WHERE id = $id");
+        $ttalJR = $sql_ttal_jr->fetch_assoc();
+
+        $jr_ttal = intval($ttalJR['ttal_jr']) + 1;
+
+        $idOv = $data['id_worker'];
+        $dateN = date("Y-m-d");
+        $idp_ = $ttalJR['id_projet'];
+        $idq_ = $ttalJR['id_quinzaine'];
+
+        $pointage_ov = $conn->prepare("INSERT INTO tab_histo_pointage_ouvrier (id_projet, id_quinzaine, id_ouvrier, date_pointage) VALUES (?, ?, ?, ?)");
+        $pointage_ov->bind_param("ssss", $idp_, $idq_, $idOv, $dateN);
+        $pointage_ov->execute();
+
+        $colonn = "jr".$getDiffDay;
+        $pointe_val = '1';
+
+        $stmt = $conn->prepare("UPDATE tab_ov_quinzaine SET $colonn = ?, ttal_jr = ?, jr_pointage = ? WHERE id = ? ");
+        $stmt->bind_param("sssi",$pointe_val, $jr_ttal, $dateHeurActuelle, $id);
+    
+        // ✅ Exécution
+        if ($stmt->execute()) {
+            echo json_encode(["success" => true, "message" => "Pointage effectué !"]);
+        } else {
+            echo json_encode(["success" => false, "message" => "Une erreur est survenue, réessayer encore !"]);
+        }
+    
+        $stmt->close();
+        // $db_verify->close();
+    }
+    function histoPointage($conn, $idQ) {
+
+                // -- DATE_FORMAT(p.date_pointage, '%d-%m-%Y') AS jour,
+                // -- o.photo AS photo_base64
+        $query = "SELECT 
+                DATE_FORMAT(p.date_pointage, '%d-%m-%Y') AS jour,
+                p.date_pointage AS jour,
+                o.nom AS nom,
+                o.fonction AS fonction,
+                o.photo AS photo_base64p
+            FROM tab_histo_pointage_ouvrier p
+            INNER JOIN tab_ov_quinzaine o ON p.id_ouvrier = o.id
+            WHERE p.id_quinzaine = ?
+            ORDER BY p.date_pointage ASC, o.nom ASC ";
+
+        $stmt = $conn->prepare($query);
+        $stmt->bind_param("i", $idQ);
+        $stmt->execute();
+        $res = $stmt->get_result();
+
+        $results = [];
+        while ($row = $res->fetch_assoc()) {
+            $row['photo_base64'] = base64_encode($row['photo_base64p']);
+            $results[] = [
+                "jour"     => $row["jour"],
+                "name"     => $row["nom"],
+                "function" => $row["fonction"],
+                "photo"    => $row["photo_base64"]
+            ];
+        }
+        // echo json_encode($idQ);
+        header('Content-Type: application/json');
+        echo json_encode($results);
+        exit;
+    }
+
+
+    function createWorkerDepuisQuinz($conn, $data) {
 
         if (!$data) {
             echo json_encode(["success" => false, "message" => "JSON invalide ou vide"]);
@@ -541,13 +665,42 @@
         }
     
         // Extraction et validation des champs
-        $name = $conn->real_escape_string($data['name'] ?? '');
-        $function = $conn->real_escape_string($data['function'] ?? '');
-        $phone = $conn->real_escape_string($data['phone'] ?? '');
-        $price = $conn->real_escape_string($data['price'] ?? '');
-        $date = $conn->real_escape_string($data['date'] ?? '');
-        $mobile_money = 'Mtn-money';
+        $idProjet = $data['idProjet'] ?? '';
+        $idQuinzaine = $data['idQuinzaine'] ?? '';
+        $qPeriode = $data['periode'] ?? '';
+        $name = $data['name'] ?? '';
+        $function = $data['function'] ?? '';
+        $phone = $data['phone'] ?? '';
+        $price = $data['price'] ?? '';
+        $date = $data['date'] ?? '';
+        $mobile_money = $data['mobileMoney'] ?? '';
         $photoBase64 = $data['photo'] ?? null;
+
+        $sql_verifyQ = $conn->query("SELECT nom, fonction FROM ch_ouvriers WHERE id_projet = $idProjet");
+        $verifyDate = $sql_verifyQ->fetch_assoc();
+
+        if ($sql_verifyQ->num_rows > 0) {
+
+            if ($verifyDate['nom'] == $name && $verifyDate['fonction'] == $function) {
+                # code...
+                echo json_encode([
+                    "success" => false, "message" => "Cet ouvrier fait déjà partie de la liste du projet. Veuillez enregistrer un autre ouvrier !"]);
+                exit;
+            }
+        }
+
+        $sql_verifyQOV = $conn->query("SELECT nom, fonction FROM tab_ov_quinzaine WHERE id_projet = $idProjet AND id_quinzaine = $idQuinzaine");
+        $verifOV = $sql_verifyQOV->fetch_assoc();
+
+        if ($sql_verifyQOV->num_rows > 0) {
+
+            if ($verifOV['nom'] == $name && $verifOV['fonction'] == $function) {
+                echo json_encode([
+                    "success" => false, "message" => "Cet ouvrier est déjà associé à cette session. Veuillez en enregistrer un autre !"]);
+                exit;
+            }
+        }
+
     
         if (!$name || !$function || !$phone || !$price || !$date || !$photoBase64) {
             echo json_encode(["success" => false, "message" => "Champs requis manquants"]);
@@ -563,23 +716,46 @@
     
         // 💡 Option A — stocker en BLOB dans la base :
         $null = NULL;
-        $stmt = $conn->prepare("INSERT INTO ch_ouvriers (nom, fonction, tel, prix_jr, date_add, mobile_money, photo) VALUES (?, ?, ?, ?, ?, ?, ?)");
-        $stmt->bind_param("ssssssb", $name, $function, $phone, $price, $date, $mobile_money, $null);
-        $stmt->send_long_data(6, $photo);
+        $stmt = $conn->prepare("INSERT INTO ch_ouvriers (id_projet, nom, fonction, tel, prix_jr, date_add, mobile_money, photo) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param("sssssssb", $idProjet, $name, $function, $phone, $price, $date, $mobile_money, $null);
+        $stmt->send_long_data(7, $photo);
     
-        // ✅ Exécution
+        // Exécution
         if ($stmt->execute()) {
-            echo json_encode(["success" => true]);
-        } else {
-            echo json_encode(["success" => false, "message" => "Erreur DB : " . $stmt->error]);
+
+            date_default_timezone_set('Africa/Abidjan');
+            $dateHeurActuelle = date("d-m-Y, H:i:s");
+            $val_jr = "0";
+            $val_vide = "...";
+
+            $addOv_quinz = $conn->prepare("INSERT INTO tab_ov_quinzaine (id_projet, id_quinzaine, periode, nom, fonction, prix_jr, tel, mobile_money, 
+            date_add, jr1, jr2, jr3, jr4, jr5, jr6, jr7, jr8, jr9, jr10, jr11, jr12, jr13, jr14, jr15, ttal_jr, jr_pointage, photo) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $addOv_quinz->bind_param("ssssssssssssssssssssssssssb",$idProjet, $idQuinzaine, $qPeriode, $name, $function,  $price, $phone, $mobile_money, $dateHeurActuelle, 
+            $val_jr, $val_jr, $val_jr, $val_jr, $val_jr, $val_jr, $val_jr, $val_jr, $val_jr, $val_jr, $val_jr, $val_jr, $val_jr, $val_jr, $val_jr,
+            $val_jr, $val_vide, $null);
+            $addOv_quinz->send_long_data(26, $photo);
+
+            // $addOv_quinz->execute();
+            if ($addOv_quinz->execute()) {
+                echo json_encode(["success" => true, "message" => "Ouvrier enregistré avec succès !"]);
+            }
+            else {
+                echo json_encode(["success" => false, "message" => "Une erreur est survenue lors d'insertion, réssayez encore !"]);
+            }
+
+        } 
+        else {
+            echo json_encode(["success" => false, "message" => "Une erreur est survenue lors d'insertion !"]);
+            // echo json_encode(["success" => false, "message" => "Erreur DB : " . $stmt->error]);
         }
     
         $stmt->close();
         // $conn->close();
     }
+    function listWorkersProjet($conn, $id) {
 
-    function listWorkers($conn) {
-        $result = $conn->query("SELECT * FROM ch_ouvriers ORDER BY nom ASC");
+        $result = $conn->query("SELECT * FROM ch_ouvriers WHERE id_projet = $id ORDER BY nom ASC");
 
         $ouvriers = [];
 
