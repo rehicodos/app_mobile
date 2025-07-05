@@ -82,13 +82,10 @@ class DemandeMotDePassePageState extends State<ForgotPasswordPage> {
       _showNoInternetDialog(context);
     } on TimeoutException {
       setState(() => isLoading = false);
-      _showNoInternetDialog(
-        context,
-        msg: "Une erreur est survenue : TimeoutException",
-      );
+      _showNoInternetDialog(context, msg: "Une erreur est survenue !");
     } catch (e) {
       setState(() => isLoading = false);
-      _showNoInternetDialog(context, msg: "Une erreur est survenue : $e");
+      _showNoInternetDialog(context, msg: "Une erreur est survenue !");
     } finally {
       setState(() => isLoading = false);
     }
@@ -100,7 +97,7 @@ class DemandeMotDePassePageState extends State<ForgotPasswordPage> {
       appBar: AppBar(
         title: const Text("Demande de mot de passe"),
         // backgroundColor: Colors.blueAccent,
-        backgroundColor: Colors.blue[200],
+        // backgroundColor: Colors.blue[200],
       ),
       body: ConnectionOverlayWatcher(
         child: SingleChildScrollView(
@@ -114,7 +111,7 @@ class DemandeMotDePassePageState extends State<ForgotPasswordPage> {
                     "Faites une demande de mot de passe auprès de l'administrateur",
                     style: TextStyle(
                       fontSize: 18,
-                      color: Colors.blue,
+                      color: Color(0xFF0D47A1),
                       // fontWeight: FontWeight.bold,
                       fontStyle: FontStyle.italic,
                     ),
@@ -126,8 +123,8 @@ class DemandeMotDePassePageState extends State<ForgotPasswordPage> {
                       labelText: "Votre nom, prénom",
                       prefixIcon: Icon(Icons.person),
                       border: OutlineInputBorder(),
-                      // filled: true,
-                      // fillColor: Colors.white,
+                      filled: true,
+                      fillColor: Colors.white,
                     ),
                     keyboardType: TextInputType.text,
                     textInputAction: TextInputAction.next,
@@ -142,8 +139,8 @@ class DemandeMotDePassePageState extends State<ForgotPasswordPage> {
                       labelText: 'Votre numéro de téléphone',
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.phone),
-                      // filled: true,
-                      // fillColor: Colors.white,
+                      filled: true,
+                      fillColor: Colors.white,
                     ),
                     keyboardType: TextInputType.phone,
                     // textInputAction: TextInputAction.next,

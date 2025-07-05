@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:gestio_chantier/models/quinzaine_model.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:intl/intl.dart';
 import 'dart:convert';
@@ -11,7 +13,8 @@ import 'package:http/http.dart' as http;
 import '../config/conn_backend.dart';
 
 class WorkerRegistrationCameraPage extends StatefulWidget {
-  const WorkerRegistrationCameraPage({super.key});
+  final Quinzaine infoQuinzaine;
+  const WorkerRegistrationCameraPage({super.key, required this.infoQuinzaine});
   @override
   State<WorkerRegistrationCameraPage> createState() =>
       _WorkerRegistrationCameraPageState();
@@ -24,6 +27,7 @@ class _WorkerRegistrationCameraPageState
   final _functionController = TextEditingController();
   final _priceController = TextEditingController();
   final _phoneController = TextEditingController();
+  String _selectedPaiement = 'Aucun';
 
   DateTime _date = DateTime.now();
   Uint8List? _photo;
@@ -35,6 +39,49 @@ class _WorkerRegistrationCameraPageState
   late FaceDetector _faceDetector;
 
   Uri connUrl_ = ConnBackend.connUrl;
+
+  void _showNoInternetDialog(BuildContext context, {String? msg}) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text("Infos ..."),
+        content: Text(
+          msg ?? "Impossible de mener l'action. Vérifiez votre connexion.",
+          // style: TextStyle(color: Colors.red),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              // Navigator.pop(context, true);
+            },
+            child: Text("OK"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showErrorDialog(BuildContext context, {String? msg}) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text("Erreur ..."),
+        content: Text(
+          msg ?? "Impossible de mener l'action. Vérifiez votre connexion.",
+          style: TextStyle(color: Colors.red),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+            child: Text("OK"),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -53,7 +100,8 @@ class _WorkerRegistrationCameraPageState
   Future<void> _initCamera() async {
     final cameras = await availableCameras();
     final rearCamera = cameras.firstWhere(
-      (cam) => cam.lensDirection == CameraLensDirection.back,
+      (cam) => cam.lensDirection == CameraLensDirection.front,
+      // (cam) => cam.lensDirection == CameraLensDirection.back,
     );
     _cameraController = CameraController(rearCamera, ResolutionPreset.medium);
     await _cameraController!.initialize();
@@ -119,22 +167,173 @@ class _WorkerRegistrationCameraPageState
     }
   }
 
+  // Future<void> _submitForm() async {
+  //   if (!_formKey.currentState!.validate() || _photo == null) {
+  //     if (!mounted) return;
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       const SnackBar(
+  //         content: Text(
+  //           "Veuillez remplir tous les champs et prendre une photo",
+  //         ),
+  //       ),
+  //     );
+  //     return;
+  //   }
+
+  //   _formKey.currentState!.save();
+
+  //   // Affiche un loader pendant l'envoi
+  //   showDialog(
+  //     context: context,
+  //     barrierDismissible: false,
+  //     builder: (_) => const Center(child: CircularProgressIndicator()),
+  //   );
+
+  //   try {
+  //     // final success = await sendWorkerToServer(
+  //     //   idProjet: widget.infoQuinzaine.idProjet,
+  //     //   idQuinzaine: widget.infoQuinzaine.id.toString(),
+  //     //   name: _nameController.text,
+  //     //   function: _functionController.text,
+  //     //   phone: _phoneController.text,
+  //     //   price: _priceController.text,
+  //     //   mobileMoney: _selectedPaiement,
+  //     //   date: DateFormat('yyyy-MM-dd').format(_date),
+  //     //   photoBytes: _photo!,
+  //     // );
+
+  //     final url = connUrl_;
+  //     final corps = jsonEncode({
+  //       "action": "create_new_ov_pageQ",
+  //       "idProjet": widget.infoQuinzaine.idProjet,
+  //       "idQuinzaine": widget.infoQuinzaine.id.toString(),
+  //       "name": _nameController.text,
+  //       "function": _functionController.text,
+  //       "phone": _phoneController.text,
+  //       "price": _priceController.text,
+  //       "date": DateFormat('yyyy-MM-dd').format(_date),
+  //       "mobileMoney": _selectedPaiement,
+  //       "photo": base64Encode(_photo!),
+  //     });
+  //     final response = await http.post(
+  //       url,
+  //       headers: {"Content-Type": "application/json"},
+  //       body: corps,
+  //     );
+
+  //     if (!mounted) return;
+  //     // Navigator.pop(context); // Ferme le loader
+
+  //     final data = jsonDecode(response.body);
+
+  //     if (response.statusCode == 200) {
+  //       if (data['success'] == true) {
+  //         Navigator.pop(context); // Ferme le loader
+  //         _showNoInternetDialog(context, msg: data['message']);
+  //         _formKey.currentState!.reset();
+  //         _nameController.clear();
+  //         _functionController.clear();
+  //         _priceController.clear();
+  //         _phoneController.clear();
+  //         setState(() {
+  //           _photo = null;
+  //           _selectedPaiement = 'Aucun';
+  //           _date = DateTime.now();
+  //         });
+  //       } else {
+  //         Navigator.pop(context);
+  //         _showErrorDialog(context, msg: data['message']);
+  //       }
+  //     } else {
+  //       Navigator.pop(context);
+  //       _showErrorDialog(context, msg: data['message']);
+  //     }
+
+  //     // if (success) {
+  //     //   if (!mounted) return;
+  //     //   showDialog(
+  //     //     context: context,
+  //     //     builder: (_) => AlertDialog(
+  //     //       title: const Text('Succès'),
+  //     //       content: const Text('Ouvrier enregistré !'),
+  //     //       actions: [
+  //     //         TextButton(
+  //     //           onPressed: () {
+  //     //             Navigator.pop(context);
+  //     //             _formKey.currentState!.reset();
+  //     //             _nameController.clear();
+  //     //             _functionController.clear();
+  //     //             _priceController.clear();
+  //     //             _phoneController.clear();
+  //     //             setState(() {
+  //     //               _photo = null;
+  //     //               _selectedPaiement = 'Aucun';
+  //     //               _date = DateTime.now();
+  //     //             });
+  //     //           },
+  //     //           child: const Text('OK'),
+  //     //         ),
+  //     //       ],
+  //     //     ),
+  //     //   );
+  //     // } else {
+  //     //   showDialog(
+  //     //     context: context,
+  //     //     builder: (_) => AlertDialog(
+  //     //       title: const Text('Erreur'),
+  //     //       content: const Text(
+  //     //         "Erreur d'enregistrement, ce ouvrier existe deja ou verifier votre connexion internet puis ressayez encore !",
+  //     //         style: TextStyle(color: Colors.red),
+  //     //       ),
+  //     //       actions: [
+  //     //         TextButton(
+  //     //           onPressed: () => Navigator.pop(context),
+  //     //           child: const Text('OK'),
+  //     //         ),
+  //     //       ],
+  //     //     ),
+  //     //   );
+  //     // }
+
+  //   } on SocketException {
+  //     _showErrorDialog(context);
+  //   } on TimeoutException {
+  //     Navigator.pop(context);
+  //     _showErrorDialog(context, msg: "Une erreur est survenue !");
+  //   } catch (e) {
+  //     Navigator.pop(context);
+  //     _showErrorDialog(context, msg: "Une erreur est survenue !");
+  //   } finally {
+  //     Navigator.pop(context);
+  //     // _showErrorDialog(context);
+  //   }
+  // }
+
   Future<void> _submitForm() async {
+    // Fermer le clavier si ouvert
+    FocusScope.of(context).unfocus();
+
+    // Vérifier que le formulaire est rempli et la photo présente
     if (!_formKey.currentState!.validate() || _photo == null) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            "Veuillez remplir tous les champs et prendre une photo",
-          ),
-        ),
+      // if (!mounted) return;
+      _showErrorDialog(
+        context,
+        msg: "Veuillez remplir tous les champs et prendre une photo",
       );
+
+      // ScaffoldMessenger.of(context).showSnackBar(
+      //   const SnackBar(
+      //     content: Text(
+      //       "Veuillez remplir tous les champs et prendre une photo",
+      //     ),
+      //   ),
+      // );
       return;
     }
 
     _formKey.currentState!.save();
 
-    // Affiche un loader pendant l'envoi
+    // Affiche le loader
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -142,98 +341,90 @@ class _WorkerRegistrationCameraPageState
     );
 
     try {
-      final success = await sendWorkerToServer(
-        name: _nameController.text,
-        function: _functionController.text,
-        phone: _phoneController.text,
-        price: _priceController.text,
-        date: DateFormat('yyyy-MM-dd').format(_date),
-        photoBytes: _photo!,
-      );
+      final response = await http
+          .post(
+            connUrl_,
+            headers: {"Content-Type": "application/json"},
+            body: jsonEncode({
+              "action": "create_new_ov_pageQ",
+              "idProjet": widget.infoQuinzaine.idProjet.toString(),
+              "idQuinzaine": widget.infoQuinzaine.id.toString(),
+              "periode": widget.infoQuinzaine.periode,
+              "name": _nameController.text,
+              "function": _functionController.text,
+              "phone": _phoneController.text,
+              "price": _priceController.text,
+              "date": DateFormat('yyyy-MM-dd').format(_date),
+              "mobileMoney": _selectedPaiement,
+              "photo": base64Encode(_photo!),
+            }),
+          )
+          .timeout(const Duration(seconds: 10)); // ⏱ Timeout
 
       if (!mounted) return;
       Navigator.pop(context); // Ferme le loader
 
-      if (success) {
-        if (!mounted) return;
-        showDialog(
-          context: context,
-          builder: (_) => AlertDialog(
-            title: const Text('Succès'),
-            content: const Text('Ouvrier enregistré !'),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  _formKey.currentState!.reset();
-                  _nameController.clear();
-                  _functionController.clear();
-                  _priceController.clear();
-                  _phoneController.clear();
-                  setState(() {
-                    _photo = null;
-                    _date = DateTime.now();
-                  });
-                },
-                child: const Text('OK'),
-              ),
-            ],
-          ),
-        );
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && data['success'] == true) {
+        _showNoInternetDialog(context, msg: data['message']);
+
+        _formKey.currentState!.reset();
+        _nameController.clear();
+        _functionController.clear();
+        _priceController.clear();
+        _phoneController.clear();
+        setState(() {
+          _photo = null;
+          _selectedPaiement = 'Aucun';
+          _date = DateTime.now();
+        });
       } else {
-        showDialog(
-          context: context,
-          builder: (_) => AlertDialog(
-            title: const Text('Erreur'),
-            content: const Text("Erreur d'enregistrement"),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('OK'),
-              ),
-            ],
-          ),
-        );
+        // Gestion spécifique des erreurs
+        final msg = data['message'] ?? "Erreur inconnue";
+        _showErrorDialog(context, msg: msg);
+      }
+    } on TimeoutException {
+      if (mounted) {
+        Navigator.pop(context);
+        _showErrorDialog(context, msg: "La connexion a expiré. Réessayez.");
+      }
+    } on SocketException {
+      if (mounted) {
+        Navigator.pop(context);
+        _showErrorDialog(context, msg: "Pas de connexion Internet.");
       }
     } catch (e) {
-      Navigator.pop(context); // Ferme le loader même si erreur
-      if (!mounted) return;
-      showDialog(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: const Text('Erreur'),
-          content: Text('Erreur lors de l\'envoi !'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
+      if (mounted) {
+        Navigator.pop(context);
+        _showErrorDialog(context, msg: "Une erreur est survenue !, $e");
+      }
     }
   }
 
   Future<bool> sendWorkerToServer({
+    required String idProjet,
+    required String idQuinzaine,
     required String name,
     required String function,
     required String phone,
     required String price,
     required String date,
+    required String mobileMoney,
     required Uint8List photoBytes,
   }) async {
     final url = connUrl_;
-    // final url = Uri.parse(
-    //   "http://192.168.1.8:8080/chantier_gestion_api/add_ouvrier.php",
-    // );
 
     final corps = jsonEncode({
-      "action": "create_new_ov",
+      "action": "create_new_ov_pageQ",
+      "idProjet": idProjet,
+      "idQuinzaine": idQuinzaine,
       "name": name,
       "function": function,
       "phone": phone,
       "price": price,
       "date": date,
+      "mobileMoney": mobileMoney,
       "photo": base64Encode(photoBytes),
     });
     final response = await http.post(
@@ -249,7 +440,7 @@ class _WorkerRegistrationCameraPageState
       return data['success'] == true;
     } catch (e) {
       throw Exception(
-        "Erreur de décodage !",
+        "Une erreur est survenue !",
         // "Erreur de décodage JSON : $e\nRéponse brute : ${response.body}",
       );
     }
@@ -273,7 +464,7 @@ class _WorkerRegistrationCameraPageState
     String? Function(String?) val,
   ) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: TextFormField(
         controller: ctrl,
         keyboardType: type,
@@ -281,6 +472,7 @@ class _WorkerRegistrationCameraPageState
           labelText: label,
           border: const OutlineInputBorder(),
         ),
+        textInputAction: TextInputAction.next,
         validator: val,
       ),
     );
@@ -290,7 +482,10 @@ class _WorkerRegistrationCameraPageState
   Widget build(BuildContext context) {
     final dateFmt = DateFormat('dd/MM/yyyy').format(_date);
     return Scaffold(
-      appBar: AppBar(title: const Text("Enregistrement Ouvrier")),
+      appBar: AppBar(
+        title: const Text("Enregistrement Ouvrier"),
+        centerTitle: true,
+      ),
       body: _isCameraReady
           ? SingleChildScrollView(
               padding: const EdgeInsets.all(20),
@@ -321,7 +516,7 @@ class _WorkerRegistrationCameraPageState
                           ],
                         ),
                         _buildTextInput(
-                          "Nom",
+                          "Nom, Prenom",
                           _nameController,
                           TextInputType.text,
                           (v) => v!.isEmpty ? "Champ requis" : null,
@@ -348,6 +543,42 @@ class _WorkerRegistrationCameraPageState
                                 ).hasMatch(v!)
                                 ? null
                                 : "Numéro invalide";
+                          },
+                        ),
+                        SizedBox(height: 3),
+                        // Dropdown
+                        DropdownButtonFormField<String>(
+                          value: _selectedPaiement,
+                          decoration: InputDecoration(
+                            labelText: 'Mode de paiement',
+                            filled: true,
+                            fillColor: Colors.white,
+                            // prefixIcon: Icon(Icons.payment, color: Colors.blue),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(5),
+                            ),
+                          ),
+                          items:
+                              [
+                                    'Aucun',
+                                    'Moov Money',
+                                    'Mtn Money',
+                                    'Orange Money',
+                                    'Wave',
+                                  ]
+                                  .map(
+                                    (mode) => DropdownMenuItem(
+                                      value: mode,
+                                      child: Text(mode),
+                                    ),
+                                  )
+                                  .toList(),
+                          onChanged: (value) {
+                            if (value != null) {
+                              _selectedPaiement = value;
+                              // Si dans un StatefulWidget, n'oublie pas setState
+                              setState(() => _selectedPaiement = value);
+                            }
                           },
                         ),
                       ],

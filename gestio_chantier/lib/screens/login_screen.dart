@@ -1,12 +1,12 @@
+import 'dart:io'; // pour SocketException
 import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import '../config/conn_backend.dart';
 import '../screens/forgot_pwd_screen.dart';
-import '../screens/home_screen.dart';
 import '../config/internet_verify.dart';
-import 'dart:io'; // pour SocketException
+import '../screens/home0_screen.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -56,7 +56,7 @@ class _LoginPageState extends State<LoginPage> {
         }),
       );
 
-      setState(() => _isLoading = false);
+      // setState(() => _isLoading = false);
 
       // Future.delayed(const Duration(seconds: 2), () {
       //   setState(() => _isLoading = false);
@@ -72,14 +72,16 @@ class _LoginPageState extends State<LoginPage> {
         if (data['success'] == true) {
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (_) => HomeScreen()),
+            MaterialPageRoute(builder: (_) => Home0Screen()),
           );
         } else {
+          setState(() => _isLoading = false);
           ScaffoldMessenger.of(
             context,
           ).showSnackBar(SnackBar(content: Text(data['message'])));
         }
       } else {
+        setState(() => _isLoading = false);
         if (!mounted) return;
         ScaffoldMessenger.of(
           context,
@@ -100,7 +102,7 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.blueGrey[50],
+      // backgroundColor: Colors.blueGrey[50],
       // backgroundColor: Colors.tealAccent,
       body: ConnectionOverlayWatcher(
         child: Center(
@@ -112,7 +114,7 @@ class _LoginPageState extends State<LoginPage> {
                 const Icon(
                   Icons.signal_wifi_statusbar_connected_no_internet_4_sharp,
                   size: 80,
-                  color: Colors.blueAccent,
+                  color: Color(0xFF1565C0),
                 ),
                 const SizedBox(height: 14),
                 const Text(
@@ -129,9 +131,12 @@ class _LoginPageState extends State<LoginPage> {
                         controller: _companyController,
                         decoration: const InputDecoration(
                           labelText: "Nom de l'entreprise",
-                          prefixIcon: Icon(Icons.business_center),
+                          prefixIcon: Icon(Icons.home_work_sharp),
                           border: OutlineInputBorder(),
+                          filled: true,
+                          fillColor: Colors.white,
                         ),
+                        textInputAction: TextInputAction.next,
                         validator: (val) =>
                             val == null || val.isEmpty ? "Champ requis" : null,
                       ),
@@ -143,6 +148,8 @@ class _LoginPageState extends State<LoginPage> {
                           labelText: "Mot de passe",
                           prefixIcon: Icon(Icons.lock),
                           border: OutlineInputBorder(),
+                          filled: true,
+                          fillColor: Colors.white,
                         ),
                         validator: (val) =>
                             val == null || val.isEmpty ? "Champ requis" : null,
@@ -155,7 +162,7 @@ class _LoginPageState extends State<LoginPage> {
                               style: ElevatedButton.styleFrom(
                                 minimumSize: const Size.fromHeight(50),
                                 // backgroundColor: const Color.fromARGB(255,178,203,247,),
-                                backgroundColor: Colors.blue[100],
+                                // backgroundColor: Colors.blue[100],
                               ),
                               child: const Text(
                                 "Se connecter",
@@ -177,7 +184,7 @@ class _LoginPageState extends State<LoginPage> {
                         },
                         child: const Text(
                           "Mot de passe oublié ?",
-                          style: TextStyle(color: Colors.blue),
+                          style: TextStyle(color: Color(0xFF0D47A1)),
                         ),
                       ),
                     ],

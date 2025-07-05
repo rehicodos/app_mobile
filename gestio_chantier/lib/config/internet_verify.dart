@@ -36,6 +36,7 @@ class _ConnectionOverlayWatcherState extends State<ConnectionOverlayWatcher> {
   Future<void> _initialCheck() async {
     final result = await Connectivity().checkConnectivity();
     setState(() {
+      // ignore: unrelated_type_equality_checks
       _isDisconnected = result == ConnectivityResult.none;
     });
   }
@@ -64,7 +65,11 @@ class _ConnectionOverlayWatcherState extends State<ConnectionOverlayWatcher> {
                   SizedBox(height: 16),
                   Text(
                     "Pas de connexion Internet",
-                    style: TextStyle(color: Colors.white, fontSize: 18),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      decoration: TextDecoration.none,
+                    ),
                   ),
                 ],
               ),
