@@ -66,6 +66,10 @@
             $idQ = intval($_GET['idQ']);
             histoPointage($conn, $idQ);
         }
+        else if ($action === 'histo_paieOv') {
+            $idQ = $_GET['idQ'];
+            histoPaieOv($conn, $idQ);
+        }
         else {
             echo json_encode(["success" => false, "message" => "Traitement ... Invalide !"]);
         }
@@ -130,7 +134,7 @@
     $conn->close();
     exit;
 
-    // ↳ Les fonctions
+    // ↳ Les fonctions utils
     function convertirEnFloatAvecVirgule($nombreAvecEspaces) {
         $nettoye = str_replace([" ", "\xc2\xa0"], "", $nombreAvecEspaces);
         $nettoye = str_replace(",", ".", $nettoye); // Convertit la virgule en point
@@ -611,9 +615,10 @@
 
         $colonn = "jr".$getDiffDay;
         $pointe_val = '1';
+        $statut = "Non solder";
 
-        $stmt = $conn->prepare("UPDATE tab_ov_quinzaine SET $colonn = ?, ttal_jr = ?, jr_pointage = ? WHERE id = ? ");
-        $stmt->bind_param("sssi",$pointe_val, $jr_ttal, $dateHeurActuelle, $id);
+        $stmt = $conn->prepare("UPDATE tab_ov_quinzaine SET $colonn = ?, ttal_jr = ?, jr_pointage = ?, statut = ? WHERE id = ? ");
+        $stmt->bind_param("ssssi",$pointe_val, $jr_ttal, $dateHeurActuelle, $statut, $id);
     
         // ✅ Exécution
         if ($stmt->execute()) {
@@ -642,7 +647,7 @@
             FROM tab_histo_pointage_ouvrier p
             INNER JOIN tab_ov_quinzaine o ON p.id_ouvrier = o.id
             WHERE p.id_quinzaine = ?
-            ORDER BY p.date_pointage ASC, o.nom ASC ";
+            ORDER BY p.date_pointage DESC, o.nom ASC ";
 
         $stmt = $conn->prepare($query);
         $stmt->bind_param("i", $idQ);
@@ -753,6 +758,37 @@
         $stmt->close();
         // $db_verify->close();
     }
+    function histoPaieOv($conn, $idQ) {
+
+        $query = "SELECT 
+                p.id,
+                p.montant,
+                p.date_heure,
+                o.nom,
+                o.fonction,
+                o.photo
+            FROM tab_histo_paie_ouvrier p
+            INNER JOIN tab_ov_quinzaine o ON p.id_ouvrier = o.id
+            WHERE p.id_quinzaine = $idQ
+            ORDER BY p.id DESC";
+
+        $result = $conn->query($query);
+        $ouvriers = [];
+
+        while ($row = $result->fetch_assoc()) {
+            $ouvriers[] = [
+                "id"         => $row["id"],
+                "montant"    => $row["montant"],
+                "date_heure" => $row["date_heure"],
+                "nomOv"      => $row["nom"],
+                "fonction"   => $row["fonction"],
+                "photo"      => base64_encode($row["photo"])
+            ];
+        }
+
+        echo json_encode($ouvriers);
+    }
+
 
 
     function createWorkerDepuisQuinz($conn, $data) {
