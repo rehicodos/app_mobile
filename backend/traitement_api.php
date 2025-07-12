@@ -24,7 +24,6 @@
         exit;
     }
 
-
     // 1. Gestion des requêtes GET (pour la liste)
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         $action = $_GET['action'] ?? null;
@@ -123,6 +122,9 @@
             break;
         case "update_ov":
             updateWorker($conn, $data);
+            break;
+        case "update_ovQuinzaine":
+            updateWorkerQuinzaine($conn, $data);
             break;
         case "delete_ov":
             deleteWorker($conn, $data);
@@ -1047,6 +1049,7 @@
         echo json_encode($ouvriers);
     }
     function updateWorker($conn, $data) {
+        
         if (!isset($data['id'], $data['name'], $data['function'], $data['phone'], $data['price'])) {
             echo json_encode(["success" => false, "message" => "Données manquantes pour update"]);
             return;
@@ -1077,6 +1080,34 @@
             ");
             $stmt->bind_param("ssssi", $name, $function, $phone, $price, $id);
         }
+
+        // echo json_encode(["success" => $stmt->execute()]);
+        if ($stmt->execute()) {
+            echo json_encode(["success" => true, "message" => "Modification effectuée !"]);
+        } else {
+            echo json_encode(["success" => false, "message" => "Échec modification !"]);
+        }
+
+        $stmt->close();
+    }
+    function updateWorkerQuinzaine($conn, $data) {
+
+        if (!isset($data['id'], $data['nom'], $data['fonction'], $data['phone'], $data['price'], $data['mobileMoney'], $data['photo'])) {
+            echo json_encode(["success" => false, "message" => "Données manquantes pour update"]);
+            return;
+        }
+        $id = intval($data['id']);
+        $name = $data['nom'];
+        $function = $data['fonction'];
+        $phone = $data['phone'];
+        $price = $data['price'];
+        $paie_mobile = $data['mobileMoney'];
+        $photo = base64_decode($data['photo']);
+
+        $stmt = $conn->prepare("UPDATE tab_ov_quinzaine SET nom=?, fonction=?, tel=?, prix_jr=?, mobile_money=?, photo=? WHERE id=? ");
+        $null = null;
+        $stmt->bind_param("sssssbi", $name, $function, $phone, $price, $paie_mobile, $null, $id);
+        $stmt->send_long_data(5, $photo);
 
         // echo json_encode(["success" => $stmt->execute()]);
         if ($stmt->execute()) {
