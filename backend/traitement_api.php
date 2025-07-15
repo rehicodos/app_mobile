@@ -69,6 +69,11 @@
             $idQ = $_GET['idQ'];
             histoPaieOv($conn, $idQ);
         }
+        else if ($action === 'list_straitantProjet') {
+            $idP = $_GET['idP'];
+            $typeOffre = $_GET['typeOffre'];
+            listStraitantsProjet($conn, $idP, $typeOffre);
+        }
         else {
             echo json_encode(["success" => false, "message" => "Traitement ... Invalide !"]);
         }
@@ -126,8 +131,20 @@
         case "update_ovQuinzaine":
             updateWorkerQuinzaine($conn, $data);
             break;
+        case "new_straitant":
+            createStraitantPrestataire($conn, $data);
+            break;
+        case "edit_straitant":
+            editeStraitantPrestataire($conn, $data);
+            break;
+        case "delete_straitant":
+            deleteStraitantPrestataire($conn, $data);
+            break;
         case "delete_ov":
             deleteWorker($conn, $data);
+            break;
+        case "delete_ovQ":
+            deleteWorkerQuinzaine($conn, $data);
             break;
         default:
             echo json_encode(["success" => false, "message" => "Traitement ... inconnue !"]);
@@ -959,7 +976,7 @@
     }
     function listWorkersProjet($conn, $id) {
 
-        $result = $conn->query("SELECT * FROM ch_ouvriers WHERE id_projet = $id ORDER BY nom ASC");
+        $result = $conn->query("SELECT * FROM ch_ouvriers WHERE id_projet = '$id' ORDER BY nom ASC");
 
         $ouvriers = [];
 
@@ -1120,7 +1137,7 @@
     }
     function deleteWorker($conn, $data) {
         if (!isset($data['id'])) {
-            echo json_encode(["success" => false, "message" => "id manquant pour delete"]);
+            echo json_encode(["success" => false, "message" => "Données manquantes pour delete"]);
             return;
         }
         $id = intval($data['id']);
@@ -1135,6 +1152,122 @@
 
         $stmt->close();
         // echo json_encode(["success" => $stmt->execute()]);
+    }
+    function deleteWorkerQuinzaine($conn, $data) {
+        if (!isset($data['id'])) {
+            echo json_encode(["success" => false, "message" => "Données manquantes pour delete"]);
+            return;
+        }
+        $id = intval($data['id']);
+        $stmt = $conn->prepare("DELETE FROM tab_ov_quinzaine WHERE id=?");
+        $stmt->bind_param("i", $id);
+
+        if ($stmt->execute()) {
+            echo json_encode(["success" => true, "message" => "Suppression effectuée !"]);
+        } else {
+            echo json_encode(["success" => false, "message" => "Échec suppression !"]);
+        }
+
+        $stmt->close();
+        // echo json_encode(["success" => $stmt->execute()]);
+    }
+
+    // Sous-traitant / Prestataire tab_straitant
+    function createStraitantPrestataire($conn, $data) {
+
+        if (!$data) {
+            echo json_encode(["success" => false, "message" => "JSON invalide ou vide"]);
+            exit;
+        }
+
+        $type_offre = $data['type_offre'] ?? '';
+        $id_projet = $data['id_projet'] ?? '';
+        $offre = $data['offre'] ?? '';
+        $ouvrier = $data['ouvrier'] ?? '';
+        $fonction = $data['fonction'] ?? '';
+        $tel_ov = $data['tel_ov'] ?? '';
+        $prix_offre = $data['prix_offre'] ?? '';
+        $versement = $data['versement'] ?? '';
+        $avances = $data['avances'] ?? '';
+        $date_ = $data['date_'] ?? '';
+        $statut = $data['statut'] ?? '';
+    
+        if (!$offre || !$ouvrier) {
+            echo json_encode(["success" => false, "message" => "Champs requis manquants"]);
+            exit;
+        }
+    
+        $stmt = $conn->prepare("INSERT INTO tab_straitant (id_projet, offre, ouvrier, fonction, tel_ov, prix_offre, versement, avances, date_add, statut, type_offre) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param("sssssssssss", $id_projet, $offre, $ouvrier, $fonction, $tel_ov, $prix_offre, $versement, $avances, $date_, $statut, $type_offre);
+    
+        // ✅ Exécution
+        if ($stmt->execute()) {
+            echo json_encode(["success" => true, "message" => "Enregistrement effectué !"]);
+        } else {
+            echo json_encode(["success" => false, "message" => "Erreur d'enregistrement"]);
+        }
+    
+        $stmt->close();
+    }
+    function editeStraitantPrestataire($conn, $data) {
+
+        if (!$data) {
+            echo json_encode(["success" => false, "message" => "JSON invalide ou vide"]);
+            exit;
+        }
+
+        $id = intval($data['id']);
+        $offre = $data['offre'] ?? '';
+        $ouvrier = $data['ouvrier'] ?? '';
+        $fonction = $data['fonction'] ?? '';
+        $tel_ov = $data['tel_ov'] ?? '';
+        $prix_offre = $data['prix_offre'] ?? '';
+        $avances = $data['avances'] ?? '';
+    
+        if (!$offre || !$ouvrier) {
+            echo json_encode(["success" => false, "message" => "Champs requis manquants"]);
+            exit;
+        }
+
+        $stmt = $conn->prepare("UPDATE tab_straitant SET  offre=?, ouvrier=?, fonction=?, tel_ov=?, prix_offre=?, avances=? WHERE id=? ");
+        $stmt->bind_param("ssssssi", $offre, $ouvrier, $fonction, $tel_ov, $prix_offre, $avances, $id);
+    
+        // ✅ Exécution
+        if ($stmt->execute()) {
+            echo json_encode(["success" => true, "message" => "Modification effectuée !"]);
+        } else {
+            echo json_encode(["success" => false, "message" => "Erreur de modification, réessayez encore"]);
+        }
+    
+        $stmt->close();
+    }
+    function deleteStraitantPrestataire($conn, $data) {
+        if (!isset($data['id'])) {
+            echo json_encode(["success" => false, "message" => "Données manquantes pour delete"]);
+            return;
+        }
+        $id = intval($data['id']);
+        $stmt = $conn->prepare("DELETE FROM tab_straitant WHERE id=?");
+        $stmt->bind_param("i", $id);
+
+        if ($stmt->execute()) {
+            echo json_encode(["success" => true, "message" => "Suppression effectuée !"]);
+        } else {
+            echo json_encode(["success" => false, "message" => "Échec suppression !"]);
+        }
+        $stmt->close();
+    }
+    function listStraitantsProjet($conn, $id, $typeOffre) {
+
+        $result = $conn->query("SELECT * FROM tab_straitant WHERE id_projet = '$id' AND type_offre = '$typeOffre' ORDER BY id DESC");
+
+        $straitants = [];
+        while ($row = $result->fetch_assoc()) {
+            $straitants[] = $row;
+        }
+        echo json_encode($straitants);
+
+        // $conn->close();
     }
 
 
