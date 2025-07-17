@@ -4,12 +4,13 @@ import 'dart:typed_data';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
-import 'package:gestio_chantier/models/quinzaine_model.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:intl/intl.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
+import '../config/internet_verify.dart';
+import '../models/quinzaine_model.dart';
 import '../config/conn_backend.dart';
 
 class WorkerRegistrationCameraPage extends StatefulWidget {
@@ -35,6 +36,10 @@ class _WorkerRegistrationCameraPageState
   CameraController? _cameraController;
   bool _isCameraReady = false;
   bool _isTakingPicture = false;
+  bool _hasSaved = false;
+
+  List<CameraDescription> _cameras = [];
+  CameraLensDirection _currentDirection = CameraLensDirection.back;
 
   late FaceDetector _faceDetector;
 
@@ -97,15 +102,61 @@ class _WorkerRegistrationCameraPageState
     );
   }
 
+  // Future<void> _initCamera() async {
+  //   final cameras = await availableCameras();
+  //   final rearCamera = cameras.firstWhere(
+  //     (cam) => cam.lensDirection == CameraLensDirection.front,
+  //     // (cam) => cam.lensDirection == CameraLensDirection.back,
+  //   );
+  //   _cameraController = CameraController(rearCamera, ResolutionPreset.medium);
+  //   await _cameraController!.initialize();
+  //   setState(() => _isCameraReady = true);
+  // }
+
+  // Initialisation
   Future<void> _initCamera() async {
-    final cameras = await availableCameras();
-    final rearCamera = cameras.firstWhere(
-      (cam) => cam.lensDirection == CameraLensDirection.front,
-      // (cam) => cam.lensDirection == CameraLensDirection.back,
+    _cameras = await availableCameras();
+
+    // Par défaut, utiliser la caméra arrière/frontale
+    final frontCamera = _cameras.firstWhere(
+      (c) => c.lensDirection == CameraLensDirection.back,
+      orElse: () => _cameras.first,
     );
-    _cameraController = CameraController(rearCamera, ResolutionPreset.medium);
+
+    _currentDirection = frontCamera.lensDirection;
+
+    _cameraController = CameraController(frontCamera, ResolutionPreset.medium);
     await _cameraController!.initialize();
-    setState(() => _isCameraReady = true);
+
+    setState(() {
+      _isCameraReady = true;
+    });
+  }
+
+  // Fonction pour basculer entre les caméras
+  Future<void> _toggleCamera() async {
+    if (_cameras.isEmpty) return;
+
+    final newDirection = _currentDirection == CameraLensDirection.front
+        ? CameraLensDirection.back
+        : CameraLensDirection.front;
+
+    final newCamera = _cameras.firstWhere(
+      (c) => c.lensDirection == newDirection,
+      orElse: () => _cameras.first,
+    );
+
+    _currentDirection = newCamera.lensDirection;
+
+    // Fermer l'ancien contrôleur
+    await _cameraController?.dispose();
+
+    _cameraController = CameraController(newCamera, ResolutionPreset.medium);
+    await _cameraController!.initialize();
+
+    setState(() {
+      _isCameraReady = true;
+    });
   }
 
   Future<bool> _detectFace(Uint8List bytes) async {
@@ -167,148 +218,6 @@ class _WorkerRegistrationCameraPageState
     }
   }
 
-  // Future<void> _submitForm() async {
-  //   if (!_formKey.currentState!.validate() || _photo == null) {
-  //     if (!mounted) return;
-  //     ScaffoldMessenger.of(context).showSnackBar(
-  //       const SnackBar(
-  //         content: Text(
-  //           "Veuillez remplir tous les champs et prendre une photo",
-  //         ),
-  //       ),
-  //     );
-  //     return;
-  //   }
-
-  //   _formKey.currentState!.save();
-
-  //   // Affiche un loader pendant l'envoi
-  //   showDialog(
-  //     context: context,
-  //     barrierDismissible: false,
-  //     builder: (_) => const Center(child: CircularProgressIndicator()),
-  //   );
-
-  //   try {
-  //     // final success = await sendWorkerToServer(
-  //     //   idProjet: widget.infoQuinzaine.idProjet,
-  //     //   idQuinzaine: widget.infoQuinzaine.id.toString(),
-  //     //   name: _nameController.text,
-  //     //   function: _functionController.text,
-  //     //   phone: _phoneController.text,
-  //     //   price: _priceController.text,
-  //     //   mobileMoney: _selectedPaiement,
-  //     //   date: DateFormat('yyyy-MM-dd').format(_date),
-  //     //   photoBytes: _photo!,
-  //     // );
-
-  //     final url = connUrl_;
-  //     final corps = jsonEncode({
-  //       "action": "create_new_ov_pageQ",
-  //       "idProjet": widget.infoQuinzaine.idProjet,
-  //       "idQuinzaine": widget.infoQuinzaine.id.toString(),
-  //       "name": _nameController.text,
-  //       "function": _functionController.text,
-  //       "phone": _phoneController.text,
-  //       "price": _priceController.text,
-  //       "date": DateFormat('yyyy-MM-dd').format(_date),
-  //       "mobileMoney": _selectedPaiement,
-  //       "photo": base64Encode(_photo!),
-  //     });
-  //     final response = await http.post(
-  //       url,
-  //       headers: {"Content-Type": "application/json"},
-  //       body: corps,
-  //     );
-
-  //     if (!mounted) return;
-  //     // Navigator.pop(context); // Ferme le loader
-
-  //     final data = jsonDecode(response.body);
-
-  //     if (response.statusCode == 200) {
-  //       if (data['success'] == true) {
-  //         Navigator.pop(context); // Ferme le loader
-  //         _showNoInternetDialog(context, msg: data['message']);
-  //         _formKey.currentState!.reset();
-  //         _nameController.clear();
-  //         _functionController.clear();
-  //         _priceController.clear();
-  //         _phoneController.clear();
-  //         setState(() {
-  //           _photo = null;
-  //           _selectedPaiement = 'Aucun';
-  //           _date = DateTime.now();
-  //         });
-  //       } else {
-  //         Navigator.pop(context);
-  //         _showErrorDialog(context, msg: data['message']);
-  //       }
-  //     } else {
-  //       Navigator.pop(context);
-  //       _showErrorDialog(context, msg: data['message']);
-  //     }
-
-  //     // if (success) {
-  //     //   if (!mounted) return;
-  //     //   showDialog(
-  //     //     context: context,
-  //     //     builder: (_) => AlertDialog(
-  //     //       title: const Text('Succès'),
-  //     //       content: const Text('Ouvrier enregistré !'),
-  //     //       actions: [
-  //     //         TextButton(
-  //     //           onPressed: () {
-  //     //             Navigator.pop(context);
-  //     //             _formKey.currentState!.reset();
-  //     //             _nameController.clear();
-  //     //             _functionController.clear();
-  //     //             _priceController.clear();
-  //     //             _phoneController.clear();
-  //     //             setState(() {
-  //     //               _photo = null;
-  //     //               _selectedPaiement = 'Aucun';
-  //     //               _date = DateTime.now();
-  //     //             });
-  //     //           },
-  //     //           child: const Text('OK'),
-  //     //         ),
-  //     //       ],
-  //     //     ),
-  //     //   );
-  //     // } else {
-  //     //   showDialog(
-  //     //     context: context,
-  //     //     builder: (_) => AlertDialog(
-  //     //       title: const Text('Erreur'),
-  //     //       content: const Text(
-  //     //         "Erreur d'enregistrement, ce ouvrier existe deja ou verifier votre connexion internet puis ressayez encore !",
-  //     //         style: TextStyle(color: Colors.red),
-  //     //       ),
-  //     //       actions: [
-  //     //         TextButton(
-  //     //           onPressed: () => Navigator.pop(context),
-  //     //           child: const Text('OK'),
-  //     //         ),
-  //     //       ],
-  //     //     ),
-  //     //   );
-  //     // }
-
-  //   } on SocketException {
-  //     _showErrorDialog(context);
-  //   } on TimeoutException {
-  //     Navigator.pop(context);
-  //     _showErrorDialog(context, msg: "Une erreur est survenue !");
-  //   } catch (e) {
-  //     Navigator.pop(context);
-  //     _showErrorDialog(context, msg: "Une erreur est survenue !");
-  //   } finally {
-  //     Navigator.pop(context);
-  //     // _showErrorDialog(context);
-  //   }
-  // }
-
   Future<void> _submitForm() async {
     // Fermer le clavier si ouvert
     FocusScope.of(context).unfocus();
@@ -367,6 +276,7 @@ class _WorkerRegistrationCameraPageState
       final data = jsonDecode(response.body);
 
       if (response.statusCode == 200 && data['success'] == true) {
+        _hasSaved = true;
         _showNoInternetDialog(context, msg: data['message']);
 
         _formKey.currentState!.reset();
@@ -481,141 +391,141 @@ class _WorkerRegistrationCameraPageState
   @override
   Widget build(BuildContext context) {
     final dateFmt = DateFormat('dd/MM/yyyy').format(_date);
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Enregistrement Ouvrier"),
-        centerTitle: true,
-      ),
-      body: _isCameraReady
-          ? SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                children: [
-                  Form(
-                    key: _formKey,
-                    child: Column(
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          Navigator.pop(context, _hasSaved);
+        }
+      },
+      child: ConnectionOverlayWatcher(
+        child: Scaffold(
+          appBar: AppBar(
+            title: const Text("Enregistrement Ouvrier"),
+            centerTitle: true,
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.cameraswitch),
+                onPressed: _toggleCamera,
+              ),
+            ],
+          ),
+          body: _isCameraReady
+              ? SingleChildScrollView(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    children: [
+                      Form(
+                        key: _formKey,
+                        child: Column(
                           children: [
-                            Text("Date d'ajout : $dateFmt"),
-                            // ElevatedButton(
-                            //   onPressed: () async {
-                            //     final picked = await showDatePicker(
-                            //       context: context,
-                            //       initialDate: _date,
-                            //       firstDate: DateTime(2020),
-                            //       lastDate: DateTime.now(),
-                            //     );
-                            //     if (picked != null) {
-                            //       setState(() => _date = picked);
-                            //     }
-                            //   },
-                            //   child: const Text("Changer"),
-                            // ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [Text("Date d'ajout : $dateFmt")],
+                            ),
+                            _buildTextInput(
+                              "Nom, Prenom",
+                              _nameController,
+                              TextInputType.text,
+                              (v) => v!.isEmpty ? "Champ requis" : null,
+                            ),
+                            _buildTextInput(
+                              "Fonction",
+                              _functionController,
+                              TextInputType.text,
+                              (v) => v!.isEmpty ? "Champ requis" : null,
+                            ),
+                            _buildTextInput(
+                              "Prix journalier",
+                              _priceController,
+                              TextInputType.number,
+                              (v) => v!.isEmpty ? "Champ requis" : null,
+                            ),
+                            _buildTextInput(
+                              "Téléphone",
+                              _phoneController,
+                              TextInputType.phone,
+                              (v) {
+                                return RegExp(
+                                      r'^(?:\+33|0)[1-9](?:[\s.-]?\d{2}){4}$',
+                                    ).hasMatch(v!)
+                                    ? null
+                                    : "Numéro invalide";
+                              },
+                            ),
+                            SizedBox(height: 3),
+                            // Dropdown
+                            DropdownButtonFormField<String>(
+                              value: _selectedPaiement,
+                              decoration: InputDecoration(
+                                labelText: 'Mode de paiement',
+                                filled: true,
+                                fillColor: Colors.white,
+                                // prefixIcon: Icon(Icons.payment, color: Colors.blue),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(5),
+                                ),
+                              ),
+                              items:
+                                  [
+                                        'Aucun',
+                                        'Moov Money',
+                                        'Mtn Money',
+                                        'Orange Money',
+                                        'Wave',
+                                      ]
+                                      .map(
+                                        (mode) => DropdownMenuItem(
+                                          value: mode,
+                                          child: Text(mode),
+                                        ),
+                                      )
+                                      .toList(),
+                              onChanged: (value) {
+                                if (value != null) {
+                                  _selectedPaiement = value;
+                                  // Si dans un StatefulWidget, n'oublie pas setState
+                                  setState(() => _selectedPaiement = value);
+                                }
+                              },
+                            ),
                           ],
                         ),
-                        _buildTextInput(
-                          "Nom, Prenom",
-                          _nameController,
-                          TextInputType.text,
-                          (v) => v!.isEmpty ? "Champ requis" : null,
+                      ),
+                      const SizedBox(height: 10),
+                      Container(
+                        width: 200,
+                        height: 150,
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey),
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        _buildTextInput(
-                          "Fonction",
-                          _functionController,
-                          TextInputType.text,
-                          (v) => v!.isEmpty ? "Champ requis" : null,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: CameraPreview(_cameraController!),
                         ),
-                        _buildTextInput(
-                          "Prix journalier",
-                          _priceController,
-                          TextInputType.number,
-                          (v) => v!.isEmpty ? "Champ requis" : null,
-                        ),
-                        _buildTextInput(
-                          "Téléphone",
-                          _phoneController,
-                          TextInputType.phone,
-                          (v) {
-                            return RegExp(
-                                  r'^(?:\+33|0)[1-9](?:[\s.-]?\d{2}){4}$',
-                                ).hasMatch(v!)
-                                ? null
-                                : "Numéro invalide";
-                          },
-                        ),
-                        SizedBox(height: 3),
-                        // Dropdown
-                        DropdownButtonFormField<String>(
-                          value: _selectedPaiement,
-                          decoration: InputDecoration(
-                            labelText: 'Mode de paiement',
-                            filled: true,
-                            fillColor: Colors.white,
-                            // prefixIcon: Icon(Icons.payment, color: Colors.blue),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(5),
-                            ),
-                          ),
-                          items:
-                              [
-                                    'Aucun',
-                                    'Moov Money',
-                                    'Mtn Money',
-                                    'Orange Money',
-                                    'Wave',
-                                  ]
-                                  .map(
-                                    (mode) => DropdownMenuItem(
-                                      value: mode,
-                                      child: Text(mode),
-                                    ),
-                                  )
-                                  .toList(),
-                          onChanged: (value) {
-                            if (value != null) {
-                              _selectedPaiement = value;
-                              // Si dans un StatefulWidget, n'oublie pas setState
-                              setState(() => _selectedPaiement = value);
-                            }
-                          },
-                        ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(height: 10),
+                      ElevatedButton.icon(
+                        onPressed: _capturePhoto,
+                        icon: const Icon(Icons.camera),
+                        label: const Text("Capturer photo"),
+                      ),
+                      const SizedBox(height: 10),
+                      _photo != null
+                          ? Image.memory(_photo!, width: 200, height: 150)
+                          : const Text("Aucune photo"),
+                      const SizedBox(height: 20),
+                      ElevatedButton(
+                        onPressed: _submitForm,
+                        child: const Text("Enregistrer l'ouvrier"),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 10),
-                  Container(
-                    width: 200,
-                    height: 150,
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: CameraPreview(_cameraController!),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  ElevatedButton.icon(
-                    onPressed: _capturePhoto,
-                    icon: const Icon(Icons.camera),
-                    label: const Text("Capturer photo"),
-                  ),
-                  const SizedBox(height: 10),
-                  _photo != null
-                      ? Image.memory(_photo!, width: 200, height: 150)
-                      : const Text("Aucune photo"),
-                  const SizedBox(height: 20),
-                  ElevatedButton(
-                    onPressed: _submitForm,
-                    child: const Text("Enregistrer l'ouvrier"),
-                  ),
-                ],
-              ),
-            )
-          : const Center(child: CircularProgressIndicator()),
+                )
+              : const Center(child: CircularProgressIndicator()),
+        ),
+      ),
     );
   }
 }

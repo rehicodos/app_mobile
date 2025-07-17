@@ -29,6 +29,9 @@ class _PageOuvrierPointageState extends State<PageOuvrierPointage> {
   final DateTime _date = DateTime.now();
   bool _hasSaved = false;
 
+  List<CameraDescription> _cameras = [];
+  CameraLensDirection _currentDirection = CameraLensDirection.back;
+
   CameraController? _cameraController;
   bool _isCameraReady = false;
   final FaceDetector _faceDetector = FaceDetector(
@@ -46,15 +49,61 @@ class _PageOuvrierPointageState extends State<PageOuvrierPointage> {
     _loadWorkers();
   }
 
+  // Future<void> _initCamera() async {
+  //   final cameras = await availableCameras();
+  //   final rear = cameras.firstWhere(
+  //     // (c) => c.lensDirection == CameraLensDirection.back,
+  //     (c) => c.lensDirection == CameraLensDirection.front,
+  //   );
+  //   _cameraController = CameraController(rear, ResolutionPreset.medium);
+  //   await _cameraController!.initialize();
+  //   setState(() => _isCameraReady = true);
+  // }
+
+  // Initialisation
   Future<void> _initCamera() async {
-    final cameras = await availableCameras();
-    final rear = cameras.firstWhere(
-      // (c) => c.lensDirection == CameraLensDirection.back,
-      (c) => c.lensDirection == CameraLensDirection.front,
+    _cameras = await availableCameras();
+
+    // Par défaut, utiliser la caméra arrière/frontale
+    final frontCamera = _cameras.firstWhere(
+      (c) => c.lensDirection == CameraLensDirection.back,
+      orElse: () => _cameras.first,
     );
-    _cameraController = CameraController(rear, ResolutionPreset.medium);
+
+    _currentDirection = frontCamera.lensDirection;
+
+    _cameraController = CameraController(frontCamera, ResolutionPreset.medium);
     await _cameraController!.initialize();
-    setState(() => _isCameraReady = true);
+
+    setState(() {
+      _isCameraReady = true;
+    });
+  }
+
+  // Fonction pour basculer entre les caméras
+  Future<void> _toggleCamera() async {
+    if (_cameras.isEmpty) return;
+
+    final newDirection = _currentDirection == CameraLensDirection.front
+        ? CameraLensDirection.back
+        : CameraLensDirection.front;
+
+    final newCamera = _cameras.firstWhere(
+      (c) => c.lensDirection == newDirection,
+      orElse: () => _cameras.first,
+    );
+
+    _currentDirection = newCamera.lensDirection;
+
+    // Fermer l'ancien contrôleur
+    await _cameraController?.dispose();
+
+    _cameraController = CameraController(newCamera, ResolutionPreset.medium);
+    await _cameraController!.initialize();
+
+    setState(() {
+      _isCameraReady = true;
+    });
   }
 
   Future<void> _loadWorkers() async {
@@ -324,7 +373,14 @@ class _PageOuvrierPointageState extends State<PageOuvrierPointage> {
           appBar: AppBar(
             title: const Text("Pointage des ouvriers"),
             centerTitle: true,
-            backgroundColor: Colors.blue[900],
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.cameraswitch),
+                onPressed: _toggleCamera,
+              ),
+            ],
+
+            // backgroundColor: Colors.blue[900],
           ),
           body: _isLoading
               ? const Center(child: CircularProgressIndicator())

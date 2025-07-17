@@ -15,6 +15,10 @@ class WorkersQuinzaine {
       mobileMoney,
       ttalJr,
       jrPointage,
+      paiement,
+      // solder,
+      reste,
+      statut,
       gainQuinzaine;
   final Uint8List photo;
 
@@ -31,6 +35,10 @@ class WorkersQuinzaine {
     required this.mobileMoney,
     required this.ttalJr,
     required this.jrPointage,
+    required this.paiement,
+    // required this.solder,
+    required this.reste,
+    required this.statut,
     required this.gainQuinzaine,
   });
 
@@ -41,18 +49,26 @@ class WorkersQuinzaine {
     idQuinzaine: e['id_quinzaine'],
     nom: e['nom'],
     fonction: e['fonction'],
-    prixJr: formatNombreStr(e['prix_jr']),
+    prixJr: e['prix_jr'],
     tel: e['tel'],
     dateAdd: e['date_add'],
     photo: base64Decode(e['photo_base64']),
     mobileMoney: e['mobile_money'],
     ttalJr: e['ttal_jr'],
     jrPointage: e['jr_pointage'],
-    // gainQuinzaine: (int.parse(e['ttal_jr']) * int.parse(e['prix_jr'])).toString(),
+    paiement: formatNombreStr(e['paiement']),
+    statut: e['statut'],
+
     gainQuinzaine: formatNombreStr(
       ((int.tryParse(e['ttal_jr'].toString()) ?? 0) *
-              (int.tryParse(e['prix_jr'].toString()) ?? 0))
+              (int.tryParse(enleverEspaces(e['prix_jr'].toString())) ?? 0))
           .toString(),
     ),
+    reste:
+        (((int.tryParse(e['ttal_jr'].toString()) ?? 0) *
+                    (int.tryParse(enleverEspaces(e['prix_jr'].toString())) ??
+                        0)) -
+                (int.tryParse(enleverEspaces(e['paiement'].toString())) ?? 0))
+            .toString(),
   );
 }

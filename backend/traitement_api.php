@@ -131,6 +131,9 @@
         case "update_ovQuinzaine":
             updateWorkerQuinzaine($conn, $data);
             break;
+        case "versementContrat":
+            versementStraitantPrestataire($conn, $data);
+            break;
         case "new_straitant":
             createStraitantPrestataire($conn, $data);
             break;
@@ -809,7 +812,6 @@
     }
 
 
-
     function createWorkerDepuisQuinz($conn, $data) {
 
         if (!$data) {
@@ -1190,6 +1192,7 @@
         $versement = $data['versement'] ?? '';
         $avances = $data['avances'] ?? '';
         $date_ = $data['date_'] ?? '';
+        $delai_contrat = $data['delai_contrat'] ?? '';
         $statut = $data['statut'] ?? '';
     
         if (!$offre || !$ouvrier) {
@@ -1197,14 +1200,47 @@
             exit;
         }
     
-        $stmt = $conn->prepare("INSERT INTO tab_straitant (id_projet, offre, ouvrier, fonction, tel_ov, prix_offre, versement, avances, date_add, statut, type_offre) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->bind_param("sssssssssss", $id_projet, $offre, $ouvrier, $fonction, $tel_ov, $prix_offre, $versement, $avances, $date_, $statut, $type_offre);
+        $stmt = $conn->prepare("INSERT INTO tab_straitant (id_projet, offre, ouvrier, fonction, tel_ov, prix_offre, versement, avances, date_add, delai_contrat, statut, type_offre) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param("ssssssssssss", $id_projet, $offre, $ouvrier, $fonction, $tel_ov, $prix_offre, $versement, $avances, $date_, $delai_contrat, $statut, $type_offre);
     
         // ✅ Exécution
         if ($stmt->execute()) {
             echo json_encode(["success" => true, "message" => "Enregistrement effectué !"]);
         } else {
             echo json_encode(["success" => false, "message" => "Erreur d'enregistrement"]);
+        }
+    
+        $stmt->close();
+    }
+    function versementStraitantPrestataire($conn, $data) {
+
+        if (!$data) {
+            echo json_encode(["success" => false, "message" => "JSON invalide ou vide"]);
+            exit;
+        }
+
+        $id = intval($data['idC']);
+        $montant = $data['montantVerser'];
+        $statut = $data['statut'];
+    
+        if (!$id || !$montant) {
+            echo json_encode(["success" => false, "message" => "Champs requis manquants"]);
+            exit;
+        }
+
+        $sql_ttal_versement = $conn->query("SELECT versement FROM tab_straitant WHERE id = '$id'");
+        $ttalversement = $sql_ttal_versement->fetch_assoc();
+
+        $ttalV = intval($ttalversement['versement']) + intval($montant);
+
+        $stmt = $conn->prepare("UPDATE tab_straitant SET versement=?, statut=? WHERE id=? ");
+        $stmt->bind_param("ssi", $ttalV, $statut, $id);
+    
+        // ✅ Exécution
+        if ($stmt->execute()) {
+            echo json_encode(["success" => true, "message" => "Versement effectuée !"]);
+        } else {
+            echo json_encode(["success" => false, "message" => "Une erreur est survenue, réessayez encore"]);
         }
     
         $stmt->close();
@@ -1222,15 +1258,17 @@
         $fonction = $data['fonction'] ?? '';
         $tel_ov = $data['tel_ov'] ?? '';
         $prix_offre = $data['prix_offre'] ?? '';
-        $avances = $data['avances'] ?? '';
+        $avances = $data['avancesC'] ?? '';
+        $delai_contrat = $data['delai_contrat'] ?? '';
+        $statut = $data['statut'] ?? '';
     
         if (!$offre || !$ouvrier) {
             echo json_encode(["success" => false, "message" => "Champs requis manquants"]);
             exit;
         }
 
-        $stmt = $conn->prepare("UPDATE tab_straitant SET  offre=?, ouvrier=?, fonction=?, tel_ov=?, prix_offre=?, avances=? WHERE id=? ");
-        $stmt->bind_param("ssssssi", $offre, $ouvrier, $fonction, $tel_ov, $prix_offre, $avances, $id);
+        $stmt = $conn->prepare("UPDATE tab_straitant SET  offre=?, ouvrier=?, fonction=?, tel_ov=?, prix_offre=?, avances=?, delai_contrat=?, statut=? WHERE id=? ");
+        $stmt->bind_param("ssssssssi", $offre, $ouvrier, $fonction, $tel_ov, $prix_offre, $avances, $delai_contrat, $statut, $id);
     
         // ✅ Exécution
         if ($stmt->execute()) {

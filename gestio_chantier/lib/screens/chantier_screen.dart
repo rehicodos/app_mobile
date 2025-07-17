@@ -2,7 +2,9 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
-import '../screens/list_ovProjet_screen.dart';
+import 'list_ov_projet_screen.dart';
+// import '../screens/new_straitant_screen.dart';
+import '../screens/feuille_straitant_screen.dart';
 import '../config/internet_verify.dart';
 import '../screens/edit_quinzaine_screen.dart';
 import '../models/pwds.dart';
@@ -326,6 +328,64 @@ class _ChantierScreenState extends State<ChantierScreen> {
     }
   }
 
+  void _optionStraitPrestation() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        alignment:
+            Alignment.center, // Centrage du dialog lui-même (Flutter 3.7+)
+        title: const Center(
+          child: Text("Option action", textAlign: TextAlign.center),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.of(context).pop();
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => FeuilleSousTraitant(
+                      projet: widget.projet,
+                      typeOffre: 'straitant',
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.engineering),
+              label: const Text("Sous-traitant"),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFF0D47A1),
+                foregroundColor: Colors.white,
+              ),
+            ),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.of(context).pop();
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => FeuilleSousTraitant(
+                      projet: widget.projet,
+                      typeOffre: 'prestation',
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.engineering_outlined),
+              label: const Text("Prestation"),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFF0D47A1),
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return ConnectionOverlayWatcher(
@@ -333,7 +393,23 @@ class _ChantierScreenState extends State<ChantierScreen> {
         appBar: AppBar(
           // automaticallyImplyLeading: false, // ✅ pas de flèche ni drawer
           centerTitle: true,
-          title: const Text('Projet'),
+          title: const Text('Détails du projet'),
+          // actions: [
+          //   IconButton(
+          //     icon: Icon(Icons.groups_2_rounded),
+          //     onPressed: () {
+          //       // Action quand on clique sur le tout
+          //       Navigator.push(
+          //         context,
+          //         MaterialPageRoute(
+          //           builder: (context) => PageOuvrierProjet(
+          //             idProjet: widget.projet.id.toString(),
+          //           ),
+          //         ),
+          //       );
+          //     },
+          //   ),
+          // ],
           // backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         ),
 
@@ -355,40 +431,7 @@ class _ChantierScreenState extends State<ChantierScreen> {
                         children: [
                           GestureDetector(
                             onTap: () {
-                              // Action quand on clique sur le tout
-                              Navigator.of(context).popUntil(
-                                (route) => route.isFirst,
-                              ); // Ferme tout sauf la première page
-                            },
-                            child: const Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.home_outlined,
-                                  size: 27,
-                                  color: Colors.blue,
-                                ),
-                                Text(
-                                  "Accueil",
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.black,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          GestureDetector(
-                            onTap: () {
                               _addNewProjet();
-                              // Action quand on clique sur le tout
-                              // Navigator.push(
-                              //   context,
-                              //   MaterialPageRoute(
-                              //     builder: (context) =>
-                              //         NewQuinzaine(idProjet: widget.projet.id),
-                              //   ),
-                              // );
                             },
                             child: const Column(
                               mainAxisSize: MainAxisSize.min,
@@ -401,7 +444,7 @@ class _ChantierScreenState extends State<ChantierScreen> {
                                 Text(
                                   "+_Session",
                                   style: TextStyle(
-                                    fontSize: 10,
+                                    fontSize: 9,
                                     color: Colors.black,
                                   ),
                                 ),
@@ -411,7 +454,82 @@ class _ChantierScreenState extends State<ChantierScreen> {
                           GestureDetector(
                             onTap: () {
                               // _addNewProjet();
+                            },
+                            child: const Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.webhook_sharp,
+                                  size: 27,
+                                  color: Colors.blue,
+                                ),
+                                Text(
+                                  "Suivi Mat.",
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    color: Colors.black,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () {
                               // Action quand on clique sur le tout
+                            },
+                            child: const Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.event_note_sharp,
+                                  // Icons.now_widgets_outlined,
+                                  size: 27,
+                                  color: Colors.blue,
+                                ),
+                                // SizedBox(height: 0),
+                                Text(
+                                  "Rapport-jrlier",
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    color: Colors.black,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          GestureDetector(
+                            onTap: () {
+                              // Navigator.push(
+                              //   context,
+                              //   MaterialPageRoute(
+                              //     builder: (context) => FeuilleSousTraitant(
+                              //       projet: widget.projet,
+                              //     ),
+                              //   ),
+                              // );
+                              _optionStraitPrestation();
+                            },
+                            child: const Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.engineering,
+                                  size: 27,
+                                  color: Colors.blue,
+                                ),
+                                Text(
+                                  "Contrats",
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    color: Colors.black,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
@@ -425,66 +543,21 @@ class _ChantierScreenState extends State<ChantierScreen> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(
-                                  Icons.library_books_outlined,
+                                  // Icons.engineering_outlined,
+                                  Icons.groups_2_rounded,
                                   size: 27,
                                   color: Colors.blue,
                                 ),
                                 Text(
-                                  "Ouvriers",
+                                  "Liste ouvriers",
                                   style: TextStyle(
-                                    fontSize: 10,
+                                    fontSize: 9,
                                     color: Colors.black,
                                   ),
                                 ),
                               ],
                             ),
                           ),
-
-                          GestureDetector(
-                            onTap: () {
-                              // Action quand on clique sur le tout
-                            },
-                            child: const Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.library_add_outlined,
-                                  // Icons.now_widgets_outlined,
-                                  size: 27,
-                                  color: Colors.blue,
-                                ),
-                                // SizedBox(height: 0),
-                                Text(
-                                  "Rapport-jrlier",
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.black,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          // GestureDetector(
-                          //   onTap: () {
-                          //     // Action quand on clique sur le tout
-                          //   },
-                          //   child: const Column(
-                          //     mainAxisSize: MainAxisSize.min,
-                          //     children: [
-                          //       Icon(
-                          //         Icons.swap_vert_circle_outlined,
-                          //         // Icons.now_widgets_outlined,
-                          //         size: 27,
-                          //         color: Colors.blue,
-                          //       ),
-                          //       // SizedBox(height: 0),
-                          //       Text(
-                          //         "Suivi-Mat",
-                          //         style: TextStyle(fontSize: 10, color: Colors.black),
-                          //       ),
-                          //     ],
-                          //   ),
-                          // ),
                         ],
                       ),
                     ),

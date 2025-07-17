@@ -46,15 +46,17 @@ class _LoginPageState extends State<LoginPage> {
     setState(() => _isLoading = true);
 
     try {
-      final response = await http.post(
-        ConnBackend.connUrl,
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({
-          "action": "login",
-          "company": _companyController.text.trim(),
-          "pwdae": _passwordController.text,
-        }),
-      );
+      final response = await http
+          .post(
+            ConnBackend.connUrl,
+            headers: {"Content-Type": "application/json"},
+            body: jsonEncode({
+              "action": "login",
+              "company": _companyController.text.trim(),
+              "pwdae": _passwordController.text,
+            }),
+          )
+          .timeout(const Duration(seconds: 10));
 
       // setState(() => _isLoading = false);
 
@@ -92,7 +94,10 @@ class _LoginPageState extends State<LoginPage> {
       _showNoInternetDialog(context);
     } on TimeoutException {
       setState(() => _isLoading = false);
-      _showNoInternetDialog(context, msg: "Une erreur est survenue");
+      _showNoInternetDialog(
+        context,
+        msg: "Erreur, la requete a mis du temps. Réessayer encore.",
+      );
     } catch (e) {
       setState(() => _isLoading = false);
       _showNoInternetDialog(context, msg: "Une erreur est survenue");

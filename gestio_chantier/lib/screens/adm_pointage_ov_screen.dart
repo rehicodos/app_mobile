@@ -165,13 +165,14 @@ class _PageOuvrierPointageStateAdm extends State<PageOuvrierPointageAdm> {
                       child: Column(
                         // crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          const SizedBox(height: 8),
+                          // const SizedBox(height: 4),
                           Text(
                             "Nombre d'ouvrier à pointer : $_ttalOvProjet",
                             style: const TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.bold,
                               color: Colors.blueGrey,
+                              // color: Color(0xFF0D47A1),
                             ),
                           ),
                         ],

@@ -1,13 +1,19 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import '../screens/edite_ov_quinz_screen.dart';
+import '../screens/feuille_pointage_screen.dart';
+import '../config/separe_millier.dart';
+import '../screens/paiement_ov_screen.dart';
 import '../screens/assoc_ov_quinz_listovprojet_screen.dart';
 import '../screens/adm_pointage_ov_screen.dart';
 import '../screens/histo_pointage_screen.dart';
-import '../models/ovQuinzaine_model.dart';
+import '../models/ov_quinzaine_model.dart';
 import '../config/conn_backend.dart';
-import '../models/ouvrier_model.dart';
+// import '../models/ouvrier_model.dart';
 import '../models/quinzaine_model.dart';
 import '../screens/pointage_ov_screen.dart';
 import '../screens/add_ouvrier_screen.dart';
@@ -57,79 +63,93 @@ class QuinzaineScreenState extends State<QuinzaineScreen> {
     });
   }
 
-  Future<void> _confirmAdminAction({required VoidCallback onConfirmed}) async {
-    final ctrl = TextEditingController();
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Confirmation admin'),
-        content: TextField(
-          controller: ctrl,
-          obscureText: true,
-          decoration: const InputDecoration(labelText: 'Mot de passe admin'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Annuler'),
+  Future<void> _deleteWorker(int id) async {
+    try {
+      final reponse = await http
+          .post(
+            connUrl_,
+            headers: {"Content-Type": "application/json"},
+            body: jsonEncode({"action": "delete_ovQ", 'id': id.toString()}),
+          )
+          .timeout(const Duration(seconds: 10)); // ⏱ Timeout;
+
+      final reponseData = jsonDecode(reponse.body);
+
+      if (reponseData['success'] == true) {
+        if (!mounted) return;
+        showDialog(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Text('Info'),
+            content: Text(reponseData['message']),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, ctrl.text == 'admin123'),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true) {
-      onConfirmed();
-    } else if (confirmed == false) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Mot de passe incorrect')));
+        );
+        setState(() {
+          _workers.removeWhere((ouvr) => ouvr.id == id);
+          ttalouvier = _workers.length;
+        });
+      } else {
+        _showDialogMessage(reponseData['message']);
+      }
+    } on TimeoutException {
+      if (mounted) {
+        Navigator.pop(context);
+        _showDialogMessage("La connexion a expiré. Réessayez.");
+      }
+    } on SocketException {
+      if (mounted) {
+        Navigator.pop(context);
+        _showDialogMessage("Pas de connexion Internet.");
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context);
+        _showDialogMessage("Une erreur est survenue !, $e");
+      }
     }
   }
 
-  Future<void> _deleteWorker(int id) async {
-    final reponse = await http.post(
-      connUrl_,
-      headers: {"Content-Type": "application/json"},
-      body: jsonEncode({"action": "delete_ov", 'id': id.toString()}),
-    );
-    final reponseData = jsonDecode(reponse.body);
-    if (!mounted) return;
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Info'),
-        content: Text(reponseData['message']),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
-    _loadWorkers();
+  void _onDelete(String pointage, int idOv) {
+    if (pointage != '0') {
+      _showDialogMessage(
+        "Cet ouvrier a déjà été pointé, il ne peut donc pas être supprimé.",
+      );
+    } else {
+      // _confirmAdm(onConfirmed: () => _deleteWorker(idOv));
+      String verifiAction = controlAction();
+      if (verifiAction == '0') {
+        _showDialogMessage("La session n'a pas encore commencé !");
+      } else if (verifiAction == '1') {
+        _showDialogMessage("La session est terminée !");
+      } else if (verifiAction == '11') {
+        _confirmAdm(onConfirmed: () => _deleteWorker(idOv));
+      } else {
+        _showDialogMessage(verifiAction);
+      }
+    }
   }
 
-  void _onDelete(Worker w) {
-    _confirmAdminAction(onConfirmed: () => _deleteWorker(w.id));
-  }
-
-  void _onEdit(Worker w) {
-    _confirmAdminAction(
-      onConfirmed: () {
-        // Redirection vers un formulaire pré-rempli d'édition
-        // Ici tu pourras injecter 'w' dans le formulaire de modification.
-
-        // Navigator.push(
-        //   context,
-        //   MaterialPageRoute(builder: (_) => WorkerEditPage(worker: w)),
-        // );
-      },
-    );
+  void _onEdit(w) {
+    String verifiAction = controlAction();
+    if (verifiAction == '0') {
+      _showDialogMessage("La session n'a pas encore commencé !");
+    } else if (verifiAction == '1') {
+      _showDialogMessage("La session est terminée !");
+    } else if (verifiAction == '11') {
+      _confirmAdm(
+        onConfirmed: () {
+          _navigateToEditeOv(w);
+        },
+      );
+    } else {
+      _showDialogMessage(verifiAction);
+    }
   }
 
   // void _showDialogMessage(String msg, {bool success = false}) {
@@ -139,7 +159,7 @@ class QuinzaineScreenState extends State<QuinzaineScreen> {
       builder: (_) => AlertDialog(
         // title: Text(success ? "Succès" : "Erreur"),
         title: Text("Attention ..."),
-        content: Text(msg, style: TextStyle(fontSize: 18, color: Colors.red)),
+        content: Text(msg, style: TextStyle(fontSize: 16, color: Colors.red)),
         // backgroundColor: success ? Colors.green[100] : Colors.red[100],
         actions: [
           TextButton(
@@ -455,6 +475,42 @@ class QuinzaineScreenState extends State<QuinzaineScreen> {
     }
   }
 
+  void _navigateToPaieOv() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PagePaiementOv(q: widget.quinzaine),
+      ),
+    );
+    if (result == true) {
+      _loadWorkers(); // 🔁 Recharge la liste si un projet a été ajouté
+    }
+  }
+
+  void _navigateToEditeOv(w) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => UpdateOuvrierPageQ(ouvrier: w)),
+    );
+    if (result == true) {
+      _loadWorkers(); // 🔁 Recharge la liste si un projet a été ajouté
+    }
+  }
+
+  Widget statutText(String statut, String ttalJrs) {
+    return Text(
+      ttalJrs == '0' ? '...' : statut,
+      style: TextStyle(
+        color: statut.trim().toLowerCase() == 'solder'
+            ? const Color.fromARGB(255, 2, 104, 5)
+            : Colors.red,
+        fontSize: 8,
+        fontStyle: FontStyle.italic,
+        fontWeight: FontWeight.bold,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return ConnectionOverlayWatcher(
@@ -515,7 +571,7 @@ class QuinzaineScreenState extends State<QuinzaineScreen> {
                                 Text(
                                   "+_Ouvrier",
                                   style: TextStyle(
-                                    fontSize: 10,
+                                    fontSize: 9,
                                     color: Colors.black,
                                   ),
                                 ),
@@ -565,7 +621,7 @@ class QuinzaineScreenState extends State<QuinzaineScreen> {
                                 Text(
                                   "Pointage",
                                   style: TextStyle(
-                                    fontSize: 10,
+                                    fontSize: 9,
                                     color: Colors.black,
                                   ),
                                 ),
@@ -600,7 +656,7 @@ class QuinzaineScreenState extends State<QuinzaineScreen> {
                                 Text(
                                   "Histo_pointage",
                                   style: TextStyle(
-                                    fontSize: 10,
+                                    fontSize: 9,
                                     color: Colors.black,
                                   ),
                                 ),
@@ -611,12 +667,17 @@ class QuinzaineScreenState extends State<QuinzaineScreen> {
                           GestureDetector(
                             onTap: () {
                               // Action quand on clique sur le tout
+                              _confirmAdm(
+                                onConfirmed: () {
+                                  _navigateToPaieOv();
+                                },
+                              );
                             },
                             child: const Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(
-                                  Icons.send_to_mobile_outlined,
+                                  Icons.monetization_on_outlined,
                                   // Icons.now_widgets_outlined,
                                   size: 27,
                                   color: Colors.blue,
@@ -625,7 +686,46 @@ class QuinzaineScreenState extends State<QuinzaineScreen> {
                                 Text(
                                   "Paiement",
                                   style: TextStyle(
-                                    fontSize: 10,
+                                    fontSize: 9,
+                                    color: Colors.black,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          GestureDetector(
+                            onTap: () {
+                              // Action quand on clique sur le tout
+
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => FeuillePointageOv(
+                                    quinzaine: widget.quinzaine,
+                                  ),
+                                ),
+                              );
+                              // _confirmAdm(
+                              //   onConfirmed: () {
+                              //     _navigateToPaieOv();
+                              //   },
+                              // );
+                            },
+                            child: const Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.receipt_long,
+                                  // Icons.now_widgets_outlined,
+                                  size: 27,
+                                  color: Colors.blue,
+                                ),
+                                // SizedBox(height: 0),
+                                Text(
+                                  "Fiche pointage",
+                                  style: TextStyle(
+                                    fontSize: 9,
                                     color: Colors.black,
                                   ),
                                 ),
@@ -804,45 +904,24 @@ class QuinzaineScreenState extends State<QuinzaineScreen> {
                                                         ),
                                                       ),
                                                       Text(
-                                                        w.fonction,
+                                                        "${w.fonction}\nPrix jr: ${formatNombreStr(w.prixJr)} f\nTel: ${w.tel}\nPointage: ${w.ttalJr} jr(s)\nPaie ttal: ${w.gainQuinzaine} f",
                                                         style: TextStyle(
-                                                          fontSize: 10,
+                                                          fontSize: 8,
                                                           fontStyle:
                                                               FontStyle.italic,
                                                         ),
                                                       ),
                                                       Text(
-                                                        "Prix jr: ${w.prixJr} f",
+                                                        "Payé: ${w.paiement} f, Reste: ${formatNombreStr(w.reste)}",
                                                         style: TextStyle(
-                                                          fontSize: 10,
+                                                          fontSize: 8,
                                                           fontStyle:
                                                               FontStyle.italic,
                                                         ),
                                                       ),
-                                                      Text(
-                                                        "Tel: ${w.tel}",
-                                                        style: TextStyle(
-                                                          fontSize: 10,
-                                                          fontStyle:
-                                                              FontStyle.italic,
-                                                        ),
-                                                      ),
-
-                                                      Text(
-                                                        "Pointage: ${w.ttalJr} jr(s)",
-                                                        style: TextStyle(
-                                                          fontSize: 10,
-                                                          fontStyle:
-                                                              FontStyle.italic,
-                                                        ),
-                                                      ),
-                                                      Text(
-                                                        "Paie ttal: ${w.gainQuinzaine} f",
-                                                        style: TextStyle(
-                                                          fontSize: 10,
-                                                          fontStyle:
-                                                              FontStyle.italic,
-                                                        ),
+                                                      statutText(
+                                                        w.statut,
+                                                        w.ttalJr,
                                                       ),
                                                     ],
                                                   ),
@@ -863,7 +942,9 @@ class QuinzaineScreenState extends State<QuinzaineScreen> {
                                         Row(
                                           children: [
                                             TextButton.icon(
-                                              onPressed: () {},
+                                              onPressed: () {
+                                                _onEdit(w);
+                                              },
 
                                               label: Icon(
                                                 Icons.edit_square,
@@ -873,7 +954,9 @@ class QuinzaineScreenState extends State<QuinzaineScreen> {
                                             ),
 
                                             TextButton.icon(
-                                              onPressed: () {},
+                                              onPressed: () {
+                                                _onDelete(w.ttalJr, w.id);
+                                              },
                                               label: Icon(
                                                 Icons.delete_forever,
                                                 size: 27,

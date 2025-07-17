@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+// import 'package:intl/intl.dart';
+// import 'package:intl/date_symbol_data_file.dart';
 import 'routes/app_routes.dart';
 import 'config/theme.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized(); // ESSENTIEL pour plugins natifs
+  // await initializeDateFormatting('fr_FR'); // Initialise les locales françaises
   runApp(const MyApp());
 }
 
