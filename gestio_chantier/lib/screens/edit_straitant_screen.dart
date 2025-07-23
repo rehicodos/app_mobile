@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 // import 'package:intl/intl.dart';
 import 'dart:convert';
 import '../config/separe_millier.dart';
@@ -26,9 +27,13 @@ class EditStraitantState extends State<EditStraitant> {
   late TextEditingController _telController;
   late TextEditingController _prixOffreController;
   late TextEditingController _avancesController;
-  // late DateTime _date = DateTime.now();
+  final _delaiContratController = TextEditingController();
+  final DateTime _date = DateTime.now();
+  late DateTime _startDate0;
+  late DateTime _startDate;
   bool isLoading = false;
   bool _hasSaved = false; // Pour savoir si un projet a été ajouté
+  String _statut = 'non';
 
   @override
   void initState() {
@@ -41,6 +46,48 @@ class EditStraitantState extends State<EditStraitant> {
       text: widget.contrat.prixOffre,
     );
     _avancesController = TextEditingController(text: widget.contrat.avances);
+    _ifDate();
+    _startDate = _startDate0;
+    _updateControllers();
+  }
+
+  void _updateControllers() {
+    _delaiContratController.text = _formatDate(_startDate);
+  }
+
+  void _ifDate() {
+    if (widget.contrat.delaiContrat != '') {
+      _startDate0 = DateFormat('dd-MM-yyyy').parse(widget.contrat.delaiContrat);
+    } else {
+      _startDate0 = _date;
+    }
+  }
+
+  String _formatDate(DateTime date) {
+    // return "${date.year}-${_pad(date.month)}-${_pad(date.day)}";
+    return "${_pad(date.day)}-${_pad(date.month)}-${date.year}";
+  }
+
+  String _pad(int n) => n.toString().padLeft(2, '0');
+
+  Future<void> _pickDate({required bool isStart}) async {
+    DateTime initial = _startDate;
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime.now(), // ✅ aujourd’hui minimum
+      lastDate: DateTime.now().add(Duration(days: 120)), // ✅ 2 mois max
+    );
+
+    if (picked != null) {
+      setState(() {
+        if (isStart) {
+          _startDate = picked;
+          _updateControllers();
+        }
+      });
+    }
   }
 
   void _showNoInternetDialog(BuildContext context, {String? msg}) {
@@ -101,70 +148,91 @@ class EditStraitantState extends State<EditStraitant> {
     int? prixAvance = int.tryParse(
       enleverEspaces(_avancesController.text.trim()),
     );
+
+    int? versement = int.tryParse(enleverEspaces(widget.contrat.versement));
+
     if (prixAvance! > prixOffre!) {
       _showErrorDialog(
         context,
-        msg: "L'avance ne doit pas etre supperieur au prix de l'offre !",
+        msg: "L'avance ne doit pas être supérieure au prix de l'offre !",
       );
-    } else {
+      return;
+    }
+    if (versement != null && prixAvance != 0) {
+      int total = prixAvance + versement;
+
+      if (total > prixOffre) {
+        _showErrorDialog(
+          context,
+          msg:
+              "L'avance et le versement ne doivent pas dépasser le prix de l'offre !",
+        );
+        return;
+      } else if (total == prixOffre) {
+        _statut = 'oui';
+      }
+    }
+
+    // Si aucune erreur, alors on envoie les données
+    setState(() => isLoading = true);
+
+    try {
+      final response = await http
+          .post(
+            ConnBackend.connUrl,
+            headers: {"Content-Type": "application/json"},
+            body: jsonEncode({
+              "action": "edit_straitant",
+              "id": widget.contrat.id.toString(),
+              "offre": _offreController.text.trim(),
+              "ouvrier": _ouvrierController.text.trim(),
+              "fonction": _fonctionController.text.trim(),
+              "tel_ov": _telController.text.trim(),
+              "prix_offre": enleverEspaces(
+                _prixOffreController.text.trim(),
+              ).toString(),
+              "avancesC": enleverEspaces(
+                _avancesController.text.trim(),
+              ).toString(),
+              "delai_contrat": DateFormat('dd-MM-yyyy').format(_startDate),
+              "statut": _statut.toString(),
+            }),
+          )
+          .timeout(const Duration(seconds: 10));
+
       setState(() => isLoading = true);
 
-      try {
-        final response = await http
-            .post(
-              ConnBackend.connUrl,
-              headers: {"Content-Type": "application/json"},
-              body: jsonEncode({
-                "action": "edit_straitant",
-                "id": widget.contrat.id.toString(),
-                "offre": _offreController.text.trim(),
-                "ouvrier": _ouvrierController.text.trim(),
-                "fonction": _fonctionController.text.trim(),
-                "tel_ov": _telController.text.trim(),
-                "prix_offre": enleverEspaces(
-                  _prixOffreController.text.trim(),
-                ).toString(),
-                "avances": enleverEspaces(
-                  _avancesController.text.trim(),
-                ).toString(),
-              }),
-            )
-            .timeout(const Duration(seconds: 10));
+      final data = jsonDecode(response.body);
 
-        setState(() => isLoading = true);
-
-        final data = jsonDecode(response.body);
-
-        if (response.statusCode == 200) {
-          _hasSaved = true; // Le projet a été ajouté
-          if (!mounted) return;
-          if (data['success'] == true) {
-            _showNoInternetDialog(context, msg: data['message']);
-            _offreController.clear();
-            _ouvrierController.clear();
-            _fonctionController.clear();
-            _prixOffreController.clear();
-            _telController.clear();
-            _avancesController.clear();
-          } else {
-            _showErrorDialog(context, msg: data['message']);
-          }
+      if (response.statusCode == 200) {
+        _hasSaved = true; // Le projet a été ajouté
+        if (!mounted) return;
+        if (data['success'] == true) {
+          _showNoInternetDialog(context, msg: data['message']);
+          _offreController.clear();
+          _ouvrierController.clear();
+          _fonctionController.clear();
+          _prixOffreController.clear();
+          _telController.clear();
+          _avancesController.clear();
         } else {
-          if (!mounted) return;
           _showErrorDialog(context, msg: data['message']);
         }
-      } on SocketException {
-        setState(() => isLoading = false);
-        _showErrorDialog(context);
-      } on TimeoutException {
-        setState(() => isLoading = false);
-        _showErrorDialog(context, msg: "Une erreur est survenue !");
-      } catch (e) {
-        setState(() => isLoading = false);
-        _showErrorDialog(context, msg: "Une erreur est survenue !");
-      } finally {
-        setState(() => isLoading = false);
+      } else {
+        if (!mounted) return;
+        _showErrorDialog(context, msg: data['message']);
       }
+    } on SocketException {
+      setState(() => isLoading = false);
+      _showErrorDialog(context);
+    } on TimeoutException {
+      setState(() => isLoading = false);
+      _showErrorDialog(context, msg: "Une erreur est survenue !");
+    } catch (e) {
+      setState(() => isLoading = false);
+      _showErrorDialog(context, msg: "Une erreur est survenue !");
+    } finally {
+      setState(() => isLoading = false);
     }
   }
 
@@ -205,7 +273,7 @@ class EditStraitantState extends State<EditStraitant> {
                       controller: _offreController,
                       decoration: const InputDecoration(
                         labelText: "Description contrat",
-                        prefixIcon: Icon(Icons.new_label),
+                        prefixIcon: Icon(Icons.new_label, color: Colors.blue),
                         border: OutlineInputBorder(),
                         filled: true,
                         fillColor: Colors.white,
@@ -220,7 +288,7 @@ class EditStraitantState extends State<EditStraitant> {
                       controller: _ouvrierController,
                       decoration: const InputDecoration(
                         labelText: "Nom ouvrier",
-                        prefixIcon: Icon(Icons.engineering),
+                        prefixIcon: Icon(Icons.engineering, color: Colors.blue),
                         border: OutlineInputBorder(),
                         filled: true,
                         fillColor: Colors.white,
@@ -235,7 +303,10 @@ class EditStraitantState extends State<EditStraitant> {
                       controller: _fonctionController,
                       decoration: const InputDecoration(
                         labelText: "Fonction ouvrier",
-                        prefixIcon: Icon(Icons.sensor_occupied_rounded),
+                        prefixIcon: Icon(
+                          Icons.sensor_occupied_rounded,
+                          color: Colors.blue,
+                        ),
                         border: OutlineInputBorder(),
                         filled: true,
                         fillColor: Colors.white,
@@ -250,7 +321,10 @@ class EditStraitantState extends State<EditStraitant> {
                       controller: _telController,
                       decoration: const InputDecoration(
                         labelText: "Numéro ouvrier",
-                        prefixIcon: Icon(Icons.phone_callback_rounded),
+                        prefixIcon: Icon(
+                          Icons.phone_callback_rounded,
+                          color: Colors.blue,
+                        ),
                         border: OutlineInputBorder(),
                         filled: true,
                         fillColor: Colors.white,
@@ -271,7 +345,10 @@ class EditStraitantState extends State<EditStraitant> {
                       controller: _prixOffreController,
                       decoration: const InputDecoration(
                         labelText: "Prix offre",
-                        prefixIcon: Icon(Icons.attach_money),
+                        prefixIcon: Icon(
+                          Icons.attach_money,
+                          color: Colors.blue,
+                        ),
                         border: OutlineInputBorder(),
                         filled: true,
                         fillColor: Colors.white,
@@ -287,15 +364,34 @@ class EditStraitantState extends State<EditStraitant> {
                       controller: _avancesController,
                       decoration: const InputDecoration(
                         labelText: "Avance",
-                        prefixIcon: Icon(Icons.monetization_on),
+                        prefixIcon: Icon(
+                          Icons.monetization_on,
+                          color: Colors.blue,
+                        ),
                         border: OutlineInputBorder(),
                         filled: true,
                         fillColor: Colors.white,
                       ),
                       keyboardType: TextInputType.number,
-                      // textInputAction: TextInputAction.next,
+                      textInputAction: TextInputAction.next,
                       validator: (val) =>
                           val == null || val.isEmpty ? "Champ requis" : null,
+                    ),
+                    const SizedBox(height: 10),
+                    TextFormField(
+                      controller: _delaiContratController,
+                      readOnly: true,
+                      decoration: InputDecoration(
+                        labelText: 'Delai contrat',
+                        // suffixIcon: Icon(Icons.calendar_today),
+                        prefixIcon: Icon(
+                          Icons.calendar_month_rounded,
+                          color: Colors.blue,
+                        ),
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
+                      onTap: () => _pickDate(isStart: true),
                     ),
 
                     const SizedBox(height: 20),

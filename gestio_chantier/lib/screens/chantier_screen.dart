@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'list_ov_projet_screen.dart';
-// import '../screens/new_straitant_screen.dart';
+import '../screens/histo_livraison_mat_screen.dart';
+import '../screens/histo_sortie_mat_screen.dart';
+import '../screens/histo_rapport_jr_screen.dart';
 import '../screens/feuille_straitant_screen.dart';
 import '../config/internet_verify.dart';
 import '../screens/edit_quinzaine_screen.dart';
@@ -121,6 +123,7 @@ class _ChantierScreenState extends State<ChantierScreen> {
     pwdSuper = pwds.pwdSAd;
     pwdChefCh = pwds.pwdChefCh;
     pwd_ = [pwdChefCh, pwd, pwdSuper];
+
     // if (!mounted) return;
     // _showPwds(context, msg: pwdSuper);
   }
@@ -386,6 +389,60 @@ class _ChantierScreenState extends State<ChantierScreen> {
     );
   }
 
+  void _optionSuiviMat() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        alignment:
+            Alignment.center, // Centrage du dialog lui-même (Flutter 3.7+)
+        title: const Center(
+          child: Text("Option action", textAlign: TextAlign.center),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.of(context).pop();
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        HistoLivraisonMatScreen(projet: widget.projet),
+                  ),
+                );
+              },
+              // icon: const Icon(Icons.engineering),
+              label: const Text("Livraison matérels/riaux"),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFF0D47A1),
+                foregroundColor: Colors.white,
+              ),
+            ),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.of(context).pop();
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        HistoSortieMatScreen(projet: widget.projet),
+                  ),
+                );
+              },
+              // icon: const Icon(Icons.engineering_outlined),
+              label: const Text("Sortie de matériels"),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFF0D47A1),
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return ConnectionOverlayWatcher(
@@ -454,6 +511,7 @@ class _ChantierScreenState extends State<ChantierScreen> {
                           GestureDetector(
                             onTap: () {
                               // _addNewProjet();
+                              _optionSuiviMat();
                             },
                             child: const Column(
                               mainAxisSize: MainAxisSize.min,
@@ -476,6 +534,15 @@ class _ChantierScreenState extends State<ChantierScreen> {
                           GestureDetector(
                             onTap: () {
                               // Action quand on clique sur le tout
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => HistoRapportJrScreen(
+                                    projet: widget.projet,
+                                  ),
+                                  // NewRapport(projet: widget.projet),
+                                ),
+                              );
                             },
                             child: const Column(
                               mainAxisSize: MainAxisSize.min,

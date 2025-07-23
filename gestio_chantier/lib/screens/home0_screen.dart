@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../screens/admin_screen.dart';
 import '../config/internet_verify.dart';
 import '../config/conn_backend.dart';
 import '../models/pwds.dart';
@@ -24,6 +25,7 @@ class _Home0State extends State<Home0Screen> {
 
   final TextEditingController _searchController = TextEditingController();
   List<Projets> _filteredProjets = []; // Liste filtrée à afficher
+  List _pwdData = [];
 
   Uri connUrl_ = ConnBackend.connUrl;
 
@@ -98,8 +100,7 @@ class _Home0State extends State<Home0Screen> {
     final pwds = await _pwds();
     pwd = pwds!.pwdAd;
     pwdSuper = pwds.pwdSAd;
-    // if (!mounted) return;
-    // _showPwds(context, msg: pwdSuper);
+    _pwdData = [pwds.pwdPortail, pwds.pwdAd, pwds.pwdSAd, pwds.entreprise];
   }
 
   Future<void> _confirmSpAdmin({required VoidCallback onConfirmed}) async {
@@ -267,6 +268,17 @@ class _Home0State extends State<Home0Screen> {
     );
   }
 
+  void _navigateToHistoChefChantier() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => AdminScreen(password: _pwdData)),
+    );
+
+    if (result == true) {
+      getPasswords(); // 🔁 Recharge la liste si un projet a été ajouté
+    }
+  }
+
   @override
   Widget build(BuildContext cintx) {
     return ConnectionOverlayWatcher(
@@ -373,7 +385,7 @@ class _Home0State extends State<Home0Screen> {
                           ),
                           GestureDetector(
                             onTap: () {
-                              // Action quand on clique sur le tout
+                              _navigateToHistoChefChantier();
                             },
                             child: const Column(
                               mainAxisSize: MainAxisSize.min,
@@ -397,6 +409,24 @@ class _Home0State extends State<Home0Screen> {
                           GestureDetector(
                             onTap: () {
                               // Action quand on clique sur le tout
+                              showDialog(
+                                context: context,
+                                builder: (_) => AlertDialog(
+                                  // title: Text(success ? "Succès" : "Erreur"),
+                                  title: Text("Besoin d'aide ?"),
+                                  content: Text(
+                                    "Contactez M. Zorobi au 05 04 45 74 83, pour repondre a tout votre besoin ou difficulté concernant l'application.",
+                                    style: TextStyle(fontSize: 14),
+                                  ),
+                                  // backgroundColor: success ? Colors.green[100] : Colors.red[100],
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context),
+                                      child: const Text("OK"),
+                                    ),
+                                  ],
+                                ),
+                              );
                             },
                             child: const Column(
                               mainAxisSize: MainAxisSize.min,
@@ -417,29 +447,29 @@ class _Home0State extends State<Home0Screen> {
                               ],
                             ),
                           ),
-                          GestureDetector(
-                            onTap: () {
-                              // Action quand on clique sur le tout
-                            },
-                            child: const Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.logout_outlined,
-                                  size: 27,
-                                  color: Colors.blue,
-                                ),
-                                // Icon(Icons.login_sharp, size: 27, color: Colors.blue),
-                                Text(
-                                  "Déconnexion",
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.black,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                          // GestureDetector(
+                          //   onTap: () {
+                          //     // Action quand on clique sur le tout
+                          //   },
+                          //   child: const Column(
+                          //     mainAxisSize: MainAxisSize.min,
+                          //     children: [
+                          //       Icon(
+                          //         Icons.logout_outlined,
+                          //         size: 27,
+                          //         color: Colors.blue,
+                          //       ),
+                          //       // Icon(Icons.login_sharp, size: 27, color: Colors.blue),
+                          //       Text(
+                          //         "Déconnexion",
+                          //         style: TextStyle(
+                          //           fontSize: 10,
+                          //           color: Colors.black,
+                          //         ),
+                          //       ),
+                          //     ],
+                          //   ),
+                          // ),
                         ],
                       ),
                     ),

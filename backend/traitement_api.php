@@ -34,6 +34,14 @@
         else if ($action === 'list_projets') {
             listProjets($conn);
         }
+        else if ($action === 'list_projetsAssign') {
+            $idP = $_GET['idp'];
+            listProjetsAssign($conn, $idP);
+        }
+        else if ($action === 'list_projetsAssignSup') {
+            $idP = $_GET['idp'];
+            listProjetsAssignSup($conn, $idP);
+        }
         else if ($action === 'list_ov') {
             $id = $_GET['id'] ?? '';
             listWorkersProjet($conn, $id);
@@ -73,6 +81,21 @@
             $idP = $_GET['idP'];
             $typeOffre = $_GET['typeOffre'];
             listStraitantsProjet($conn, $idP, $typeOffre);
+        }
+        else if ($action === 'list_histo_rapportJr') {
+            $idP = $_GET['idP'];
+            listRapportJr($conn, $idP);
+        }
+        else if ($action === 'list_histo_livraisonMat') {
+            $idP = $_GET['idP'];
+            listLivraison($conn, $idP);
+        }
+        else if ($action === 'list_histo_sortieMat') {
+            $idP = $_GET['idP'];
+            listSortieMat($conn, $idP);
+        }
+        else if ($action === 'list_chefChantier') {
+            listChefChantier($conn);
         }
         else {
             echo json_encode(["success" => false, "message" => "Traitement ... Invalide !"]);
@@ -134,6 +157,9 @@
         case "versementContrat":
             versementStraitantPrestataire($conn, $data);
             break;
+        case "realisationContrat":
+            progressionStraitantPrestataire($conn, $data);
+            break;
         case "new_straitant":
             createStraitantPrestataire($conn, $data);
             break;
@@ -149,6 +175,51 @@
         case "delete_ovQ":
             deleteWorkerQuinzaine($conn, $data);
             break;
+        case "add_rapport_jr":
+            newRapportJr($conn, $data);
+            break;
+        case "add_livraison_mat":
+            newLivraisonMat($conn, $data);
+            break;
+        case "add_sortie_mat":
+            newSortieMat($conn, $data);
+            break;
+        case "edit_sortie_mat":
+            editeSortieMat($conn, $data);
+            break;
+        case "delete_sortieMat":
+            deleteSortieMat($conn, $data);
+            break;
+        case "edit_livraison_mat":
+            editeLivraisonMat($conn, $data);
+            break;
+        case "edite_rapport_jr":
+            editeRapportJr($conn, $data);
+            break;
+        case "delete_rapportJrlier":
+            deleteRapportJr($conn, $data);
+            break;
+        case "delete_livraisonMat":
+            deleteLivraison($conn, $data);
+            break;
+        case "updatePwdApp":
+            updatePwdsApp($conn, $data);
+            break;
+        case "add_chef_chantier":
+            newChefChantier($conn, $data);
+            break;
+        case "edit_chef_chantier":
+            editeChefChantier($conn, $data);
+            break;
+        case "delete_chefCH":
+            deleteChefChantier($conn, $data);
+            break;
+        case "assigner_projet":
+            assignProjetChefToChantier($conn, $data);
+            break;
+        case "assigner_projetSup":
+            SupAssignProjetChefToChantier($conn, $data);
+            break;
         default:
             echo json_encode(["success" => false, "message" => "Traitement ... inconnue !"]);
     }
@@ -163,12 +234,40 @@
         return floatval($nettoye);
     }
     function getPwds($conn) {
-        $result = $conn->query("SELECT pwd_chef_ch, pwd_adm, pwd_super_adm FROM uses_compt WHERE id=1");
+        $result = $conn->query("SELECT * FROM uses_compt WHERE id=1");
 
         $pwds = $result->fetch_assoc();
         echo json_encode($pwds);
 
         // $conn->close();
+    }
+    function updatePwdsApp($conn, $data) {
+
+        if (!$data) {
+            echo json_encode(["success" => false, "message" => "JSON invalide ou vide"]);
+            exit;
+        }
+
+        $colonne_ = $data['colonne'];
+        $newPwdApp = $data['newPwdApp'];
+    
+        if (!$colonne_ || !$newPwdApp) {
+            echo json_encode(["success" => false, "message" => "Champs requis manquants"]);
+            exit;
+        }
+    
+        $stmt = $conn->prepare("UPDATE uses_compt SET $colonne_=? WHERE id=1 ");
+        $stmt->bind_param("s", $newPwdApp);
+    
+        // ✅ Exécution
+        if ($stmt->execute()) {
+            echo json_encode(["success" => true, "message" => "Modification effectuée !"]);
+        } else {
+            echo json_encode(["success" => false, "message" => "Erreur d'enregistrement"]);
+        }
+    
+        $stmt->close();
+
     }
 
     // Gestion Login
@@ -357,6 +456,44 @@
         }
         echo json_encode($projets);
     }
+    function listProjetsAssign($conn, $idp) {
+        $projets = [];
+
+        $query = "
+            SELECT p.*
+            FROM tab_projet p
+            WHERE p.statut = 'En cours'
+            AND p.id NOT IN (
+                SELECT id_projet
+                FROM tab_assign_projet_to_chef_ch
+                WHERE id_chef_ch = ?
+            )
+            ORDER BY p.nom_projet ASC
+        ";
+
+        $stmt = $conn->prepare($query);
+        $stmt->bind_param("s", $idp);
+        $stmt->execute();
+
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            $projets[] = $row;
+        }
+
+        echo json_encode($projets);
+    }
+    function listProjetsAssignSup($conn, $id) {
+
+        $result = $conn->query("SELECT * FROM tab_assign_projet_to_chef_ch WHERE id_chef_ch = '$id' ORDER BY projet ASC");
+
+        $straitants = [];
+        while ($row = $result->fetch_assoc()) {
+            $straitants[] = $row;
+        }
+        echo json_encode($straitants);
+    }
+
+
     function updateProjet($conn, $data) {
 
         if (!isset($data['nom'], $data['client'])) {
@@ -1194,14 +1331,15 @@
         $date_ = $data['date_'] ?? '';
         $delai_contrat = $data['delai_contrat'] ?? '';
         $statut = $data['statut'] ?? '';
+        $realisation = '0';
     
         if (!$offre || !$ouvrier) {
             echo json_encode(["success" => false, "message" => "Champs requis manquants"]);
             exit;
         }
     
-        $stmt = $conn->prepare("INSERT INTO tab_straitant (id_projet, offre, ouvrier, fonction, tel_ov, prix_offre, versement, avances, date_add, delai_contrat, statut, type_offre) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->bind_param("ssssssssssss", $id_projet, $offre, $ouvrier, $fonction, $tel_ov, $prix_offre, $versement, $avances, $date_, $delai_contrat, $statut, $type_offre);
+        $stmt = $conn->prepare("INSERT INTO tab_straitant (id_projet, offre, ouvrier, fonction, tel_ov, prix_offre, versement, avances, date_add, delai_contrat, realisation, statut, type_offre) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param("sssssssssssss", $id_projet, $offre, $ouvrier, $fonction, $tel_ov, $prix_offre, $versement, $avances, $date_, $delai_contrat, $realisation, $statut, $type_offre);
     
         // ✅ Exécution
         if ($stmt->execute()) {
@@ -1239,6 +1377,33 @@
         // ✅ Exécution
         if ($stmt->execute()) {
             echo json_encode(["success" => true, "message" => "Versement effectuée !"]);
+        } else {
+            echo json_encode(["success" => false, "message" => "Une erreur est survenue, réessayez encore"]);
+        }
+    
+        $stmt->close();
+    }
+    function progressionStraitantPrestataire($conn, $data) {
+
+        if (!$data) {
+            echo json_encode(["success" => false, "message" => "JSON invalide ou vide"]);
+            exit;
+        }
+
+        $id = intval($data['idC']);
+        $realiser = $data['realisation'];
+    
+        if (!$id || !$realiser) {
+            echo json_encode(["success" => false, "message" => "Champs requis manquants"]);
+            exit;
+        }
+
+        $stmt = $conn->prepare("UPDATE tab_straitant SET realisation=? WHERE id=? ");
+        $stmt->bind_param("si", $realiser, $id);
+    
+        // ✅ Exécution
+        if ($stmt->execute()) {
+            echo json_encode(["success" => true, "message" => "Action effectuée !"]);
         } else {
             echo json_encode(["success" => false, "message" => "Une erreur est survenue, réessayez encore"]);
         }
@@ -1306,6 +1471,496 @@
         echo json_encode($straitants);
 
         // $conn->close();
+    }
+
+    // Rapport journalier
+    function newRapportJr($conn, $data) {
+
+        if (!$data) {
+            echo json_encode(["success" => false, "message" => "JSON invalide ou vide"]);
+            exit;
+        }
+
+        $id_projet = $data['id_projet'] ?? '';
+        $rapportJr = $data['rapportJr'] ?? '';
+        $incident = $data['incident'] ?? '';
+        $visite_perso = $data['visite_perso'] ?? '';
+        $essai_operation = $data['essai_operation'] ?? '';
+        $doc_recus = $data['doc_recus'] ?? '';
+        $reception_ov = $data['reception_ov'] ?? '';
+        $info_hse = $data['info_hse'] ?? '';
+        $appros_mat = $data['appros_mat'] ?? '';
+        $mat_use = $data['mat_use'] ?? '';
+        $perso_employer = $data['perso_employer'] ?? '';
+        $travo_evolution = $data['travo_evolution'] ?? '';
+        $travo_pourcntage = $data['travo_pourcntage'] ?? '';
+        $mat_en_stocks = $data['mat_en_stocks'] ?? '';
+        $observation_fin_jr = $data['observation_fin_jr'] ?? '';
+        $climat = $data['climat'] ?? '';
+        $date_ = $data['date_'] ?? '';
+    
+        if (!$rapportJr || !$incident) {
+            echo json_encode(["success" => false, "message" => "Champs requis manquants"]);
+            exit;
+        }
+    
+        $stmt = $conn->prepare("INSERT INTO tab_rapport_jr (id_projet, rapport_jr, incident, visite_perso, essai_operation, doc_recus, reception_ov, info_hse, 
+        appros_mat, mat_use, perso_employer, travo_evolution, travo_pourcntage, date_, climat, mat_en_stocks, observation_fin_jr) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param("sssssssssssssssss", $id_projet, $rapportJr, $incident, $visite_perso, $essai_operation, $doc_recus, $reception_ov, $info_hse, 
+        $appros_mat, $mat_use, $perso_employer, $travo_evolution, $travo_pourcntage, $date_, $climat, $mat_en_stocks, $observation_fin_jr);
+    
+        // ✅ Exécution
+        if ($stmt->execute()) {
+            echo json_encode(["success" => true, "message" => "Rapport enregistré !"]);
+        } else {
+            echo json_encode(["success" => false, "message" => "Erreur d'enregistrement"]);
+        }
+    
+        $stmt->close();
+    }
+    function editeRapportJr($conn, $data) {
+
+        if (!$data) {
+            echo json_encode(["success" => false, "message" => "JSON invalide ou vide"]);
+            exit;
+        }
+
+        $id_rapport = intval($data['id']);
+        $rapportJr = $data['rapportJr'] ?? '';
+        $incident = $data['incident'] ?? '';
+        $visite_perso = $data['visite_perso'] ?? '';
+        $essai_operation = $data['essai_operation'] ?? '';
+        $doc_recus = $data['doc_recus'] ?? '';
+        $reception_ov = $data['reception_ov'] ?? '';
+        $info_hse = $data['info_hse'] ?? '';
+        $appros_mat = $data['appros_mat'] ?? '';
+        $mat_use = $data['mat_use'] ?? '';
+        $perso_employer = $data['perso_employer'] ?? '';
+        $travo_evolution = $data['travo_evolution'] ?? '';
+        $travo_pourcntage = $data['travo_pourcntage'] ?? '';
+        $mat_en_stocks = $data['mat_en_stocks'] ?? '';
+        $observation_fin_jr = $data['observation_fin_jr'] ?? '';
+        $climat = $data['climat'] ?? '';
+        // $date_ = $data['date_'] ?? '';
+    
+        if (!$rapportJr || !$incident) {
+            echo json_encode(["success" => false, "message" => "Champs requis manquants"]);
+            exit;
+        }
+    
+        $stmt = $conn->prepare("UPDATE tab_rapport_jr SET rapport_jr=?, incident=?, visite_perso=?, essai_operation=?, doc_recus=?, reception_ov=?, info_hse=?, 
+        appros_mat=?, mat_use=?, perso_employer=?, travo_evolution=?, travo_pourcntage=?, climat=?, mat_en_stocks=?, observation_fin_jr=? 
+        WHERE id=? ");
+        $stmt->bind_param("sssssssssssssssi", $rapportJr, $incident, $visite_perso, $essai_operation, $doc_recus, $reception_ov, $info_hse, 
+        $appros_mat, $mat_use, $perso_employer, $travo_evolution, $travo_pourcntage, $climat, $mat_en_stocks, $observation_fin_jr, $id_rapport);
+    
+        // ✅ Exécution
+        if ($stmt->execute()) {
+            echo json_encode(["success" => true, "message" => "Rapport modifié !"]);
+        } else {
+            echo json_encode(["success" => false, "message" => "Erreur lors de la modification, réessayez encore"]);
+        }
+    
+        $stmt->close();
+    }
+    function listRapportJr($conn, $id) {
+
+        $result = $conn->query("SELECT * FROM tab_rapport_jr WHERE id_projet = '$id' ORDER BY id DESC");
+
+        $straitants = [];
+        while ($row = $result->fetch_assoc()) {
+            $straitants[] = $row;
+        }
+        echo json_encode($straitants);
+
+        // $conn->close();
+    }
+    function deleteRapportJr($conn, $data) {
+        if (!isset($data['id'])) {
+            echo json_encode(["success" => false, "message" => "Données manquantes pour delete"]);
+            return;
+        }
+        $id = intval($data['id']);
+        $stmt = $conn->prepare("DELETE FROM tab_rapport_jr WHERE id=?");
+        $stmt->bind_param("i", $id);
+
+        if ($stmt->execute()) {
+            echo json_encode(["success" => true, "message" => "Suppression effectuée !"]);
+        } else {
+            echo json_encode(["success" => false, "message" => "Échec suppression !"]);
+        }
+
+        $stmt->close();
+        // echo json_encode(["success" => $stmt->execute()]);
+    }
+
+    // Livraison matériaux
+    function newLivraisonMat($conn, $data) {
+
+        if (!$data) {
+            echo json_encode(["success" => false, "message" => "JSON invalide ou vide"]);
+            exit;
+        }
+
+        $id_projet = $data['id_projet'] ?? '';
+        $design = $data['design'] ?? '';
+        $unite = $data['unite'] ?? '';
+        $qte = $data['qte'] ?? '';
+        $nber_bl = $data['nber_bl'] ?? '';
+        $qualites = $data['qualites'] ?? '';
+        $retour_mat = $data['retour_mat'] ?? '';
+        $qte_retour_mat = $data['qte_retour_mat'] ?? '';
+
+        date_default_timezone_set('Africa/Abidjan');
+        $date_ = date("d-m-Y, H:i:s");
+    
+        if (!$design || !$unite) {
+            echo json_encode(["success" => false, "message" => "Champs requis manquants"]);
+            exit;
+        }
+    
+        $stmt = $conn->prepare("INSERT INTO tab_histo_livraison_mat (id_projet, design, unite, qte, nber_bl, qualites, retour_mat, qte_retour_mat, date_) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param("sssssssss", $id_projet, $design, $unite, $qte, $nber_bl, $qualites, $retour_mat, $qte_retour_mat, $date_);
+    
+        // ✅ Exécution
+        if ($stmt->execute()) {
+            echo json_encode(["success" => true, "message" => "L'information a été enregistrée !"]);
+        } else {
+            echo json_encode(["success" => false, "message" => "Erreur d'enregistrement"]);
+        }
+    
+        $stmt->close();
+    }
+    function editeLivraisonMat($conn, $data) {
+
+        if (!$data) {
+            echo json_encode(["success" => false, "message" => "JSON invalide ou vide"]);
+            exit;
+        }
+
+        $id = intval($data['id']);
+        $design = $data['design'] ?? '';
+        $unite = $data['unite'] ?? '';
+        $qte = $data['qte'] ?? '';
+        $nber_bl = $data['nber_bl'] ?? '';
+        $qualites = $data['qualites'] ?? '';
+        $retour_mat = $data['retour_mat'] ?? '';
+        $qte_retour_mat = $data['qte_retour_mat'] ?? '';
+    
+        if (!$design || !$unite) {
+            echo json_encode(["success" => false, "message" => "Champs requis manquants"]);
+            exit;
+        }
+    
+        $stmt = $conn->prepare("UPDATE tab_histo_livraison_mat SET design=?, unite=?, qte=?, nber_bl=?, qualites=?, retour_mat=?, qte_retour_mat=? WHERE id=? ");
+        $stmt->bind_param("sssssssi", $design, $unite, $qte, $nber_bl, $qualites, $retour_mat, $qte_retour_mat, $id);
+    
+        // ✅ Exécution
+        if ($stmt->execute()) {
+            echo json_encode(["success" => true, "message" => "Modification effectuée !"]);
+        } else {
+            echo json_encode(["success" => false, "message" => "Erreur d'enregistrement"]);
+        }
+    
+        $stmt->close();
+    }
+    function listLivraison($conn, $id) {
+
+        $result = $conn->query("SELECT * FROM tab_histo_livraison_mat WHERE id_projet = '$id' ORDER BY id DESC");
+
+        $straitants = [];
+        while ($row = $result->fetch_assoc()) {
+            $straitants[] = $row;
+        }
+        echo json_encode($straitants);
+
+        // $conn->close();
+    }
+    function deleteLivraison($conn, $data) {
+        if (!isset($data['id'])) {
+            echo json_encode(["success" => false, "message" => "Données manquantes pour delete"]);
+            return;
+        }
+        $id = intval($data['id']);
+        $stmt = $conn->prepare("DELETE FROM tab_histo_livraison_mat WHERE id=?");
+        $stmt->bind_param("i", $id);
+
+        if ($stmt->execute()) {
+            echo json_encode(["success" => true, "message" => "Suppression effectuée !"]);
+        } else {
+            echo json_encode(["success" => false, "message" => "Échec suppression !"]);
+        }
+
+        $stmt->close();
+        // echo json_encode(["success" => $stmt->execute()]);
+    }
+
+    // Sortie matériaux
+    function newSortieMat($conn, $data) {
+
+        if (!$data) {
+            echo json_encode(["success" => false, "message" => "JSON invalide ou vide"]);
+            exit;
+        }
+
+        $id_projet = $data['id_projet'] ?? '';
+        $design = $data['design'] ?? '';
+        $qte = $data['qte'] ?? '';
+        $lieu = $data['lieu'] ?? '';
+
+        date_default_timezone_set('Africa/Abidjan');
+        $date_ = date("d-m-Y, H:i:s");
+    
+        if (!$design || !$qte) {
+            echo json_encode(["success" => false, "message" => "Champs requis manquants"]);
+            exit;
+        }
+    
+        $stmt = $conn->prepare("INSERT INTO tab_sortie_mat (id_projet, design, qte, lieu, date_) 
+        VALUES (?, ?, ?, ?, ?)");
+        $stmt->bind_param("sssss", $id_projet, $design, $qte, $lieu, $date_);
+    
+        // ✅ Exécution
+        if ($stmt->execute()) {
+            echo json_encode(["success" => true, "message" => "L'information a été enregistrée !"]);
+        } else {
+            echo json_encode(["success" => false, "message" => "Erreur d'enregistrement"]);
+        }
+    
+        $stmt->close();
+    }
+    function editeSortieMat($conn, $data) {
+
+        if (!$data) {
+            echo json_encode(["success" => false, "message" => "JSON invalide ou vide"]);
+            exit;
+        }
+
+        $id = intval($data['id']);
+        $design = $data['design'] ?? '';
+        $qte = $data['qte'] ?? '';
+        $lieu = $data['lieu'] ?? '';
+    
+        if (!$design || !$qte) {
+            echo json_encode(["success" => false, "message" => "Champs requis manquants"]);
+            exit;
+        }
+    
+        $stmt = $conn->prepare("UPDATE tab_sortie_mat SET design=?, qte=?, lieu=? WHERE id=? ");
+        $stmt->bind_param("sssi", $design, $qte, $lieu, $id);
+    
+        // ✅ Exécution
+        if ($stmt->execute()) {
+            echo json_encode(["success" => true, "message" => "Modification effectuée !"]);
+        } else {
+            echo json_encode(["success" => false, "message" => "Erreur d'enregistrement"]);
+        }
+    
+        $stmt->close();
+    }
+    function listSortieMat($conn, $id) {
+
+        $result = $conn->query("SELECT * FROM tab_sortie_mat WHERE id_projet = '$id' ORDER BY id DESC");
+
+        $straitants = [];
+        while ($row = $result->fetch_assoc()) {
+            $straitants[] = $row;
+        }
+        echo json_encode($straitants);
+
+        // $conn->close();
+    }
+    function deleteSortieMat($conn, $data) {
+        if (!isset($data['id'])) {
+            echo json_encode(["success" => false, "message" => "Données manquantes pour delete"]);
+            return;
+        }
+        $id = intval($data['id']);
+        $stmt = $conn->prepare("DELETE FROM tab_sortie_mat WHERE id=?");
+        $stmt->bind_param("i", $id);
+
+        if ($stmt->execute()) {
+            echo json_encode(["success" => true, "message" => "Suppression effectuée !"]);
+        } else {
+            echo json_encode(["success" => false, "message" => "Échec suppression !"]);
+        }
+
+        $stmt->close();
+        // echo json_encode(["success" => $stmt->execute()]);
+    }
+
+    // Chef chantier
+    function editeChefChantier($conn, $data) {
+
+        if (!$data) {
+            echo json_encode(["success" => false, "message" => "JSON invalide ou vide"]);
+            exit;
+        }
+
+        $id = intval($data['id']);
+        $nom = $data['nom'] ?? '';
+        $tel = $data['tel'] ?? '';
+        $pwd = $data['pwd'] ?? '';
+    
+        if (!$nom || !$pwd) {
+            echo json_encode(["success" => false, "message" => "Champs requis manquants"]);
+            exit;
+        }
+    
+        $stmt = $conn->prepare("UPDATE tab_chef_chantier SET nom=?, tel=?, pwd=? WHERE id=? ");
+        $stmt->bind_param("sssi", $nom, $tel, $pwd, $id);
+    
+        // ✅ Exécution
+        if ($stmt->execute()) {
+            echo json_encode(["success" => true, "message" => "Modification effectuée !"]);
+        } else {
+            echo json_encode(["success" => false, "message" => "Erreur d'enregistrement"]);
+        }
+    
+        $stmt->close();
+    }
+    function newChefChantier($conn, $data) {
+
+        if (!$data) {
+            echo json_encode(["success" => false, "message" => "JSON invalide ou vide"]);
+            exit;
+        }
+
+        $nom = $data['nom'] ?? '';
+        $tel = $data['tel'] ?? '';
+        $pwd = $data['pwd'] ?? '';
+        $chantier = '';
+    
+        if (!$nom || !$pwd) {
+            echo json_encode(["success" => false, "message" => "Champs requis manquants"]);
+            exit;
+        }
+    
+        $stmt = $conn->prepare("INSERT INTO tab_chef_chantier (nom, tel, pwd, chantier) 
+        VALUES (?, ?, ?, ?)");
+        $stmt->bind_param("ssss", $nom, $tel, $pwd, $chantier);
+    
+        // ✅ Exécution
+        if ($stmt->execute()) {
+            echo json_encode(["success" => true, "message" => "Enregistrement effectuée !"]);
+        } else {
+            echo json_encode(["success" => false, "message" => "Erreur d'enregistrement"]);
+        }
+    
+        $stmt->close();
+    }
+    function listChefChantier($conn) {
+        $chefs = [];
+
+        $sql = "SELECT c.id AS id_chef, c.nom AS nom_chef, c.tel AS nber, c.pwd AS mdp, ap.projet
+            FROM tab_chef_chantier c
+            LEFT JOIN tab_assign_projet_to_chef_ch ap ON c.id = ap.id_chef_ch
+            ORDER BY c.nom ASC, ap.projet ASC
+        ";
+
+        $result = $conn->query($sql);
+
+        while ($row = $result->fetch_assoc()) {
+            $id_chef = $row['id_chef'];
+
+            if (!isset($chefs[$id_chef])) {
+                $chefs[$id_chef] = [
+                    "id" => $id_chef,
+                    "nom" => $row['nom_chef'],
+                    "tel" => $row['nber'],
+                    "pwd" => $row['mdp'],
+                    "projets" => []
+                ];
+            }
+
+            if (!empty($row['projet'])) {
+                $chefs[$id_chef]["projets"][] = $row['projet'];
+            }
+        }
+
+        // Réindexation pour un tableau propre
+        $chefs = array_values($chefs);
+
+        echo json_encode($chefs);
+    }
+
+    function deleteChefChantier($conn, $data) {
+
+        if (!isset($data['id'])) {
+            echo json_encode(["success" => false, "message" => "Données manquantes pour delete"]);
+            return;
+        }
+
+        $id_ = $data['id'];
+        $id = intval($data['id']);
+
+        $stmt_ = $conn->prepare("DELETE FROM tab_assign_projet_to_chef_ch WHERE id_chef_ch=?");
+        $stmt_->bind_param("s", $id_);
+        $stmt_->execute();
+
+        $stmt = $conn->prepare("DELETE FROM tab_chef_chantier WHERE id=?");
+        $stmt->bind_param("i", $id);
+
+        if ($stmt->execute()) {
+            echo json_encode(["success" => true, "message" => "Suppression effectuée !"]);
+        } else {
+            echo json_encode(["success" => false, "message" => "Échec suppression !"]);
+        }
+
+        $stmt_->close();
+        $stmt->close();
+    }
+
+    // Assignation projet to chef chantier
+    function assignProjetChefToChantier($conn, $data) {
+
+        if (!$data) {
+            echo json_encode(["success" => false, "message" => "JSON invalide ou vide"]);
+            exit;
+        }
+
+        $id_projet = $data['idp'] ?? '';
+        $id_chef_ch = $data['idChef'] ?? '';
+        $projet = $data['projet'] ?? '';
+    
+        if (!$id_projet || !$id_chef_ch) {
+            echo json_encode(["success" => false, "message" => "Champs requis manquants"]);
+            exit;
+        }
+    
+        $stmt = $conn->prepare("INSERT INTO tab_assign_projet_to_chef_ch (id_projet, id_chef_ch, projet) 
+        VALUES (?, ?, ?)");
+        $stmt->bind_param("sss", $id_projet, $id_chef_ch, $projet);
+    
+        // ✅ Exécution
+        if ($stmt->execute()) {
+            echo json_encode(["success" => true, "message" => "Enregistrement effectuée !"]);
+        } else {
+            echo json_encode(["success" => false, "message" => "Erreur d'enregistrement"]);
+        }
+    
+        $stmt->close();
+    }
+    function SupAssignProjetChefToChantier($conn, $data) {
+
+        if (!isset($data['id'])) {
+            echo json_encode(["success" => false, "message" => "Données manquantes pour delete"]);
+            return;
+        }
+
+        $id = intval($data['id']);
+
+        $stmt = $conn->prepare("DELETE FROM tab_assign_projet_to_chef_ch WHERE id=?");
+        $stmt->bind_param("i", $id);
+
+        if ($stmt->execute()) {
+            echo json_encode(["success" => true, "message" => "Suppression effectuée !"]);
+        } else {
+            echo json_encode(["success" => false, "message" => "Échec suppression !"]);
+        }
+
+        $stmt->close();
     }
 
 

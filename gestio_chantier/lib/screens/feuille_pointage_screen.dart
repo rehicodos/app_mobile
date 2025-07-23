@@ -361,154 +361,159 @@ class _FeuillePointageOvState extends State<FeuillePointageOv> {
                     ),
                   ),
                 ),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  child: SizedBox(
-                    // width: 950,
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.vertical,
-                      child: Column(
-                        // mainAxisAlignment: MainAxisAlignment.start,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          SizedBox(height: 10),
-                          DataTable(
-                            border: TableBorder.all(color: Colors.black),
-                            columnSpacing: 3,
-                            headingRowColor: WidgetStateProperty.all(
-                              Colors.blue[50],
-                            ),
-                            dataRowColor: WidgetStateColor.resolveWith(
-                              (states) => Colors.grey[50]!,
-                            ),
-                            columns: colonnesAffichees.map((col) {
-                              return DataColumn(
-                                label: Padding(
-                                  padding: const EdgeInsets.all(8),
-                                  child: Text(
-                                    col,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    child: SizedBox(
+                      // width: 950,
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.vertical,
+                        child: Column(
+                          // mainAxisAlignment: MainAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            SizedBox(height: 10),
+                            DataTable(
+                              border: TableBorder.all(color: Colors.black),
+                              columnSpacing: 3,
+                              headingRowColor: WidgetStateProperty.all(
+                                Colors.blue[50],
+                              ),
+                              dataRowColor: WidgetStateColor.resolveWith(
+                                (states) => Colors.grey[50]!,
+                              ),
+                              columns: colonnesAffichees.map((col) {
+                                return DataColumn(
+                                  label: Padding(
+                                    padding: const EdgeInsets.all(8),
+                                    child: Text(
+                                      col,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
                                     ),
                                   ),
-                                ),
-                              );
-                            }).toList(),
-                            rows: [
-                              ...ouvriers.map((row) {
-                                return DataRow(
-                                  cells: clesAffichees.map((cle) {
-                                    String valeur = '';
-                                    if (cle == 'paiement') {
-                                      final int ttalJr =
-                                          int.tryParse(
-                                            row['ttal_jr'].toString(),
-                                          ) ??
-                                          0;
-                                      final int prixJr =
-                                          int.tryParse(
-                                            row['prix_jr'].toString(),
-                                          ) ??
-                                          0;
-                                      valeur = formatNombreStr(
-                                        (ttalJr * prixJr).toString(),
-                                      );
-                                    } else if (cle == 'prix_jr') {
-                                      valeur = formatNombreStr(
-                                        row[cle].toString(),
-                                      );
-                                    } else {
-                                      valeur = row[cle]?.toString() ?? '';
-                                    }
-                                    return DataCell(
-                                      Padding(
-                                        padding: const EdgeInsets.all(8.0),
-                                        child: Text(
-                                          valeur,
-                                          style: const TextStyle(fontSize: 11),
-                                        ),
-                                      ),
-                                    );
-                                  }).toList(),
                                 );
-                              }),
-
-                              // ✅ Ligne Grand Totaux
-                              DataRow(
-                                color: WidgetStateProperty.all(
-                                  Colors.grey[300],
-                                ),
-                                cells: clesAffichees.map((cle) {
-                                  if (cle == 'nom') {
-                                    return const DataCell(
-                                      Padding(
-                                        padding: EdgeInsets.all(8.0),
-                                        child: Text(
-                                          'Grand Totaux',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ),
-                                    );
-                                  } else if (cle.startsWith('jr')) {
-                                    final total = ouvriers
-                                        .where(
-                                          (row) => row[cle]?.toString() == '1',
-                                        )
-                                        .length;
-                                    return DataCell(
-                                      Padding(
-                                        padding: const EdgeInsets.all(8.0),
-                                        child: Text(
-                                          total.toString(),
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                    );
-                                  } else if (cle == 'paiement') {
-                                    final totalPaiement = ouvriers.fold<int>(
-                                      0,
-                                      (sum, row) {
-                                        final int jours =
+                              }).toList(),
+                              rows: [
+                                ...ouvriers.map((row) {
+                                  return DataRow(
+                                    cells: clesAffichees.map((cle) {
+                                      String valeur = '';
+                                      if (cle == 'paiement') {
+                                        final int ttalJr =
                                             int.tryParse(
                                               row['ttal_jr'].toString(),
                                             ) ??
                                             0;
-                                        final int prix =
+                                        final int prixJr =
                                             int.tryParse(
                                               row['prix_jr'].toString(),
                                             ) ??
                                             0;
-                                        return sum + (jours * prix);
-                                      },
-                                    );
-                                    return DataCell(
-                                      Padding(
-                                        padding: const EdgeInsets.all(8.0),
-                                        child: Text(
-                                          formatNombreStr(
-                                            totalPaiement.toString(),
-                                          ),
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
+                                        valeur = formatNombreStr(
+                                          (ttalJr * prixJr).toString(),
+                                        );
+                                      } else if (cle == 'prix_jr') {
+                                        valeur = formatNombreStr(
+                                          row[cle].toString(),
+                                        );
+                                      } else {
+                                        valeur = row[cle]?.toString() ?? '';
+                                      }
+                                      return DataCell(
+                                        Padding(
+                                          padding: const EdgeInsets.all(8.0),
+                                          child: Text(
+                                            valeur,
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                    );
-                                  } else {
-                                    return const DataCell(Text(''));
-                                  }
-                                }).toList(),
-                              ),
-                            ],
-                          ),
-                        ],
+                                      );
+                                    }).toList(),
+                                  );
+                                }),
+
+                                // ✅ Ligne Grand Totaux
+                                DataRow(
+                                  color: WidgetStateProperty.all(
+                                    Colors.grey[300],
+                                  ),
+                                  cells: clesAffichees.map((cle) {
+                                    if (cle == 'nom') {
+                                      return const DataCell(
+                                        Padding(
+                                          padding: EdgeInsets.all(8.0),
+                                          child: Text(
+                                            'Grand Totaux',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    } else if (cle.startsWith('jr')) {
+                                      final total = ouvriers
+                                          .where(
+                                            (row) =>
+                                                row[cle]?.toString() == '1',
+                                          )
+                                          .length;
+                                      return DataCell(
+                                        Padding(
+                                          padding: const EdgeInsets.all(8.0),
+                                          child: Text(
+                                            total.toString(),
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    } else if (cle == 'paiement') {
+                                      final totalPaiement = ouvriers.fold<int>(
+                                        0,
+                                        (sum, row) {
+                                          final int jours =
+                                              int.tryParse(
+                                                row['ttal_jr'].toString(),
+                                              ) ??
+                                              0;
+                                          final int prix =
+                                              int.tryParse(
+                                                row['prix_jr'].toString(),
+                                              ) ??
+                                              0;
+                                          return sum + (jours * prix);
+                                        },
+                                      );
+                                      return DataCell(
+                                        Padding(
+                                          padding: const EdgeInsets.all(8.0),
+                                          child: Text(
+                                            formatNombreStr(
+                                              totalPaiement.toString(),
+                                            ),
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    } else {
+                                      return const DataCell(Text(''));
+                                    }
+                                  }).toList(),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),

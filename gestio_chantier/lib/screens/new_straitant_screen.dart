@@ -30,11 +30,49 @@ class NewStraitantState extends State<NewStraitant> {
   final _fonctionController = TextEditingController();
   final _telController = TextEditingController();
   final _prixOffreController = TextEditingController();
-  // final _versementController = TextEditingController();
+  final _delaiContratController = TextEditingController();
   final _avancesController = TextEditingController();
   final DateTime _date = DateTime.now();
+  DateTime _startDate = DateTime.now();
   bool isLoading = false;
   bool _hasSaved = false; // Pour savoir si un projet a été ajouté
+
+  @override
+  void initState() {
+    super.initState();
+    _updateControllers();
+  }
+
+  void _updateControllers() {
+    _delaiContratController.text = _formatDate(_startDate);
+  }
+
+  String _formatDate(DateTime date) {
+    // return "${date.year}-${_pad(date.month)}-${_pad(date.day)}";
+    return "${_pad(date.day)}-${_pad(date.month)}-${date.year}";
+  }
+
+  String _pad(int n) => n.toString().padLeft(2, '0');
+
+  Future<void> _pickDate({required bool isStart}) async {
+    DateTime initial = _startDate;
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime.now(), // ✅ aujourd’hui minimum
+      lastDate: DateTime.now().add(Duration(days: 120)), // ✅ 2 mois max
+    );
+
+    if (picked != null) {
+      setState(() {
+        if (isStart) {
+          _startDate = picked;
+          _updateControllers();
+        }
+      });
+    }
+  }
 
   void _showNoInternetDialog(BuildContext context, {String? msg}) {
     showDialog(
@@ -122,6 +160,7 @@ class NewStraitantState extends State<NewStraitant> {
                   _avancesController.text.trim(),
                 ).toString(),
                 "date_": DateFormat('dd-MM-yyyy').format(_date),
+                "delai_contrat": DateFormat('dd-MM-yyyy').format(_startDate),
                 "statut": "non",
               }),
             )
@@ -143,6 +182,12 @@ class NewStraitantState extends State<NewStraitant> {
             _telController.clear();
             // _resteController.clear();
             _avancesController.clear();
+            // _delaiContratController.clear();
+
+            setState(() {
+              _startDate = _date;
+              _updateControllers();
+            });
           } else {
             _showErrorDialog(context, msg: data['message']);
           }
@@ -202,7 +247,7 @@ class NewStraitantState extends State<NewStraitant> {
                       controller: _offreController,
                       decoration: const InputDecoration(
                         labelText: "Description contrat",
-                        prefixIcon: Icon(Icons.new_label),
+                        prefixIcon: Icon(Icons.new_label, color: Colors.blue),
                         border: OutlineInputBorder(),
                         filled: true,
                         fillColor: Colors.white,
@@ -217,7 +262,7 @@ class NewStraitantState extends State<NewStraitant> {
                       controller: _ouvrierController,
                       decoration: const InputDecoration(
                         labelText: "Nom ouvrier",
-                        prefixIcon: Icon(Icons.engineering),
+                        prefixIcon: Icon(Icons.engineering, color: Colors.blue),
                         border: OutlineInputBorder(),
                         filled: true,
                         fillColor: Colors.white,
@@ -232,7 +277,10 @@ class NewStraitantState extends State<NewStraitant> {
                       controller: _fonctionController,
                       decoration: const InputDecoration(
                         labelText: "Fonction ouvrier",
-                        prefixIcon: Icon(Icons.sensor_occupied_rounded),
+                        prefixIcon: Icon(
+                          Icons.sensor_occupied_rounded,
+                          color: Colors.blue,
+                        ),
                         border: OutlineInputBorder(),
                         filled: true,
                         fillColor: Colors.white,
@@ -247,7 +295,10 @@ class NewStraitantState extends State<NewStraitant> {
                       controller: _telController,
                       decoration: const InputDecoration(
                         labelText: "Numéro ouvrier",
-                        prefixIcon: Icon(Icons.phone_callback_rounded),
+                        prefixIcon: Icon(
+                          Icons.phone_callback_rounded,
+                          color: Colors.blue,
+                        ),
                         border: OutlineInputBorder(),
                         filled: true,
                         fillColor: Colors.white,
@@ -268,7 +319,10 @@ class NewStraitantState extends State<NewStraitant> {
                       controller: _prixOffreController,
                       decoration: const InputDecoration(
                         labelText: "Prix offre",
-                        prefixIcon: Icon(Icons.attach_money),
+                        prefixIcon: Icon(
+                          Icons.attach_money,
+                          color: Colors.blue,
+                        ),
                         border: OutlineInputBorder(),
                         filled: true,
                         fillColor: Colors.white,
@@ -278,35 +332,40 @@ class NewStraitantState extends State<NewStraitant> {
                       validator: (val) =>
                           val == null || val.isEmpty ? "Champ requis" : null,
                     ),
-                    // const SizedBox(height: 10),
-                    // TextFormField(
-                    //   controller: _versementController,
-                    //   decoration: const InputDecoration(
-                    //     labelText: "Versement",
-                    //     prefixIcon: Icon(Icons.monetization_on),
-                    //     border: OutlineInputBorder(),
-                    //     filled: true,
-                    //     fillColor: Colors.white,
-                    //   ),
-                    //   keyboardType: TextInputType.number,
-                    //   textInputAction: TextInputAction.next,
-                    //   validator: (val) =>
-                    //       val == null || val.isEmpty ? "Champ requis" : null,
-                    // ),
+
                     const SizedBox(height: 10),
                     TextFormField(
                       controller: _avancesController,
                       decoration: const InputDecoration(
                         labelText: "Avance",
-                        prefixIcon: Icon(Icons.monetization_on),
+                        prefixIcon: Icon(
+                          Icons.monetization_on,
+                          color: Colors.blue,
+                        ),
                         border: OutlineInputBorder(),
                         filled: true,
                         fillColor: Colors.white,
                       ),
                       keyboardType: TextInputType.number,
-                      // textInputAction: TextInputAction.next,
+                      textInputAction: TextInputAction.next,
                       validator: (val) =>
                           val == null || val.isEmpty ? "Champ requis" : null,
+                    ),
+                    const SizedBox(height: 10),
+                    TextFormField(
+                      controller: _delaiContratController,
+                      readOnly: true,
+                      decoration: InputDecoration(
+                        labelText: 'Delai contrat',
+                        // suffixIcon: Icon(Icons.calendar_today),
+                        prefixIcon: Icon(
+                          Icons.calendar_month_rounded,
+                          color: Colors.blue,
+                        ),
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
+                      onTap: () => _pickDate(isStart: true),
                     ),
 
                     const SizedBox(height: 20),

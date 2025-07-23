@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 // import 'dart:io';
+import 'package:flutter/services.dart';
+import 'package:gestio_chantier/config/internet_verify.dart';
 import 'package:gestio_chantier/screens/edit_straitant_screen.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
@@ -29,10 +31,14 @@ class _FeuilleSousTraitantState extends State<FeuilleSousTraitant> {
   List<Straitant> straitants = [];
   bool _loading = true;
   bool colonnesReduites = false;
+  bool _hasSaved = false;
 
   String txtShow = '';
   String _typeOffre = '';
   String _ttle = '';
+  String _montantPaie = '';
+  String _realiser = '';
+  String _statut = 'non';
 
   Uri connUrl_ = ConnBackend.connUrl;
 
@@ -51,6 +57,7 @@ class _FeuilleSousTraitantState extends State<FeuilleSousTraitant> {
     'Reste à solder',
     'Montant demandé',
     'Date offre validée',
+    'Délai contrat',
   ];
 
   List<String> cles = [
@@ -62,6 +69,7 @@ class _FeuilleSousTraitantState extends State<FeuilleSousTraitant> {
     'reste',
     'avances',
     'date_',
+    'delaiContrat',
   ];
 
   @override
@@ -155,7 +163,7 @@ class _FeuilleSousTraitantState extends State<FeuilleSousTraitant> {
     );
   }
 
-  void _optionAction(c, id) {
+  void _optionAction(c, id, reste, realiser) {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -181,7 +189,43 @@ class _FeuilleSousTraitantState extends State<FeuilleSousTraitant> {
             ),
             ElevatedButton.icon(
               onPressed: () {
-                Navigator.of(context).pop();
+                if (realiser == '100' || realiser == 100) {
+                  Navigator.of(context).pop();
+                  _showMessage("Contrat terminé, le pourcentage est à 100%");
+                } else {
+                  Navigator.of(context).pop();
+                  _realisationContrat(
+                    realiser: realiser,
+                    onConfirmed: () {
+                      _logiqRealisation(id, _realiser);
+                    },
+                  );
+                }
+                // Navigator.of(context).pop();
+                // _navigateToAddOvQuinzaineListProjet();
+              },
+              icon: const Icon(Icons.read_more_outlined),
+              label: const Text("Réalisation"),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFF0D47A1),
+                foregroundColor: Colors.white,
+              ),
+            ),
+            ElevatedButton.icon(
+              onPressed: () {
+                if (reste == '0' || reste == 0) {
+                  Navigator.of(context).pop();
+                  _showMessage("Rien à solder, le contrat est soldé");
+                } else {
+                  Navigator.of(context).pop();
+                  _versementContrat(
+                    ttalPaie: reste,
+                    onConfirmed: () {
+                      _logiqVersement(id, _montantPaie);
+                    },
+                  );
+                }
+                // Navigator.of(context).pop();
                 // _navigateToAddOvQuinzaineListProjet();
               },
               icon: const Icon(Icons.monetization_on),
@@ -319,362 +363,772 @@ class _FeuilleSousTraitantState extends State<FeuilleSousTraitant> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_ttle),
-        centerTitle: true,
+  void _showMessage(String msg, {bool success = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: success ? Colors.green : Colors.red,
+      ),
+    );
+  }
+
+  Future<void> _realisationContrat({
+    required realiser,
+    required VoidCallback onConfirmed,
+  }) async {
+    final TextEditingController controller = TextEditingController(
+      text: realiser,
+    );
+    final ctrl = controller;
+    // bool verify = false;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        scrollable: true, // ✅ ajoute cette ligne
+        title: const Text('Progression contrat'),
+        content: TextField(
+          controller: ctrl,
+          // obscureText: true,
+          keyboardType: TextInputType.number,
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly, // ✅ que des chiffres
+            LengthLimitingTextInputFormatter(3), // ✅ max 3 caractères
+          ],
+          onChanged: (value) {
+            if (value.isEmpty) return;
+
+            final intValue = int.tryParse(value);
+            if (intValue == null || intValue > 100) {
+              // Corrige ou vide la saisie
+              ctrl.text = '100';
+              ctrl.selection = TextSelection.fromPosition(
+                TextPosition(offset: ctrl.text.length),
+              );
+            }
+          },
+          decoration: const InputDecoration(
+            labelText: 'Renseignez la progression',
+          ),
+        ),
         actions: [
-          IconButton(
-            icon: Icon(Icons.add_circle_rounded),
-            onPressed: () => _navigateToNewOffre(),
+          TextButton(
+            // onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () {
+              if (ctrl.text == "") {
+                // if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Le champ ne doit pas etre vide !'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              } else if ((int.parse(ctrl.text)) == 0) {
+                // if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Le contenu du champ ne doit pas etre 0 !'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              } else {
+                FocusScope.of(context).unfocus();
+                Navigator.pop(context, true);
+                _realiser = ctrl.text;
+              }
+            },
+            // onPressed: () => Navigator.pop(context, ctrl.text == 'admin123'),
+            child: const Text('Enregistrer'),
           ),
         ],
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                Container(
-                  // width: double.infinity,
-                  width: MediaQuery.of(context).size.width * 1,
-                  padding: const EdgeInsets.all(10),
-                  color: Colors.grey[200],
-                  alignment: Alignment.center,
-                  child: Text(
-                    _typeOffre,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blueGrey,
-                      // color: Color(0xFF0D47A1),
-                    ),
+    );
+
+    if (confirmed == true) {
+      onConfirmed();
+    }
+  }
+
+  Future<void> _logiqRealisation(int idC, realisation) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final body = {
+        "action": "realisationContrat",
+        "idC": idC.toString(),
+        "realisation": realisation,
+      };
+
+      final res = await http
+          .post(
+            ConnBackend.connUrl,
+            headers: {"Content-Type": "application/json"},
+            body: jsonEncode(body),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      final data = jsonDecode(res.body);
+      if (!mounted) return;
+      // Navigator.pop(context); // Fermer le dialog
+      // Navigator.pop(context, true);
+
+      if (res.statusCode == 200 && data['success'] == true) {
+        _hasSaved = true;
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Action effectué !',
+              // style: TextStyle(color: Colors.red),
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        final index = straitants.indexWhere((straitant) => straitant.id == idC);
+        if (index != -1) {
+          final ancien = straitants[index];
+          final modifie = Straitant(
+            id: ancien.id,
+            versement: straitants[index].versement,
+            idProjet: straitants[index].idProjet,
+            offre: straitants[index].offre,
+            fonction: straitants[index].fonction,
+            tel: straitants[index].tel,
+            ouvrier: straitants[index].ouvrier,
+            prixOffre: straitants[index].prixOffre,
+            reste: straitants[index].reste,
+            avances: straitants[index].avances,
+            date_: straitants[index].date_,
+            delaiContrat: straitants[index].delaiContrat,
+            realisation: realisation,
+            statut: straitants[index].statut, // la nouvelle valeur
+            // ...copier les autres champs nécessaires
+          );
+          setState(() {
+            straitants[index] = modifie;
+            _realiser = '';
+          });
+        }
+      } else {
+        // if (!mounted) return;
+        Navigator.pop(context);
+        _showMessage(data['message']);
+      }
+    } on TimeoutException {
+      if (mounted) {
+        Navigator.pop(context);
+        _showMessage("Le serveur ne répond pas. Réessaye encore.");
+      }
+    } on SocketException {
+      if (mounted) {
+        Navigator.pop(context);
+        _showMessage(
+          "Pas de connexion Internet ou votre connexion est instable.",
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context); // Ferme le loader
+      _showMessage("Erreur lors du traitement ! $e");
+    }
+  }
+
+  Future<void> _versementContrat({
+    required ttalPaie,
+    required VoidCallback onConfirmed,
+  }) async {
+    final TextEditingController controller = TextEditingController(
+      text: ttalPaie,
+    );
+    final ctrl = controller;
+    // bool verify = false;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        scrollable: true, // ✅ ajoute cette ligne
+        title: const Text('Versement'),
+        content: TextField(
+          controller: ctrl,
+          // obscureText: true,
+          keyboardType: TextInputType.number,
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,3}')),
+          ],
+          decoration: const InputDecoration(
+            labelText: 'Renseignez le montant à payer',
+          ),
+        ),
+        actions: [
+          TextButton(
+            // onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () {
+              if (ctrl.text == "") {
+                // if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Le champ ne doit pas etre vide !'),
+                    backgroundColor: Colors.red,
                   ),
-                ),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  child: SizedBox(
-                    // width: 950,
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.vertical,
-                      child: Column(
-                        // mainAxisAlignment: MainAxisAlignment.start,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          SizedBox(height: 10),
-                          DataTable(
-                            border: TableBorder.all(color: Colors.black),
-                            columnSpacing: 3,
-                            headingRowColor: WidgetStateProperty.all(
-                              Colors.blue[50],
-                            ),
-                            dataRowColor: WidgetStateColor.resolveWith(
-                              (states) => Colors.grey[50]!,
-                            ),
-                            columns: colonnes.map((col) {
-                              return DataColumn(
-                                label: Padding(
-                                  padding: const EdgeInsets.all(8),
-                                  child: Text(
-                                    col,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }).toList(),
-                            rows: [
-                              ...straitants.map((Straitant row) {
-                                return DataRow(
-                                  cells: cles.map((cle) {
-                                    int index = cles.indexOf(cle);
-                                    String valeur = '';
+                );
+              } else if ((int.parse(ctrl.text)) == 0) {
+                // if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Le contenu du champ ne doit pas etre 0 !'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              } else if (ctrl.text != "") {
+                if (int.parse(ctrl.text) <= int.parse(ttalPaie)) {
+                  FocusScope.of(context).unfocus();
+                  Navigator.pop(context, true);
+                  _montantPaie = ctrl.text;
 
-                                    switch (cle) {
-                                      case 'offre':
-                                        valeur = row.offre;
-                                        break;
-                                      case 'ouvrier':
-                                        valeur = row.ouvrier;
-                                        break;
-                                      case 'fonction':
-                                        valeur = row.fonction;
-                                        break;
-                                      case 'tel':
-                                        valeur = row.tel;
-                                        break;
-                                      case 'prixOffre':
-                                        valeur = formatNombreStr(
-                                          row.prixOffre.toString(),
-                                        );
-                                        break;
-                                      case 'versement':
-                                        valeur = formatNombreStr(
-                                          row.versement.toString(),
-                                        );
-                                        break;
-                                      case 'reste':
-                                        valeur = formatNombreStr(
-                                          row.reste.toString(),
-                                        );
-                                        break;
-                                      case 'avances':
-                                        valeur = formatNombreStr(
-                                          row.avances.toString(),
-                                        );
-                                        break;
-                                      case 'date_':
-                                        valeur = row.date_;
-                                        break;
-                                    }
+                  if (int.parse(ctrl.text) == int.parse(ttalPaie)) {
+                    _statut = 'oui';
+                  }
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Le montant renseigner ne doit pas être supérieur au montant à payer !',
+                      ),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            // onPressed: () => Navigator.pop(context, ctrl.text == 'admin123'),
+            child: const Text('Payer'),
+          ),
+        ],
+      ),
+    );
 
-                                    if (index == 0 && cle == 'offre') {
-                                      return DataCell(
-                                        Padding(
-                                          padding: const EdgeInsets.all(2),
-                                          child: ConstrainedBox(
-                                            constraints: const BoxConstraints(
-                                              maxWidth: 170,
-                                            ),
-                                            child: GestureDetector(
-                                              // onDoubleTap: () {
-                                              onTap: () {
-                                                txtShow = valeur;
-                                                _optionAction(row, row.id);
-                                              },
-                                              child: Text(
-                                                valeur,
-                                                style: const TextStyle(
-                                                  fontSize: 12,
-                                                ),
-                                                softWrap: true,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      );
-                                    } else {
-                                      if (cle == 'ouvrier') {
-                                        String fonction = row.fonction;
+    if (confirmed == true) {
+      onConfirmed();
+    }
+  }
 
-                                        return DataCell(
-                                          Padding(
-                                            padding: const EdgeInsets.all(5.0),
-                                            child: ConstrainedBox(
-                                              constraints: const BoxConstraints(
-                                                maxWidth: 150,
-                                                minHeight:
-                                                    40, // garantit que la hauteur minimum est suffisante
-                                              ),
-                                              child: Center(
-                                                child: fonction != ''
-                                                    ? Text(
-                                                        "$valeur\n($fonction)",
-                                                        style: const TextStyle(
-                                                          fontSize: 12,
-                                                        ),
-                                                        softWrap: true,
-                                                        overflow: TextOverflow
-                                                            .visible,
-                                                        textAlign: TextAlign
-                                                            .center, // ← Important aussi
-                                                      )
-                                                    : Text(
-                                                        valeur,
-                                                        style: const TextStyle(
-                                                          fontSize: 11,
-                                                        ),
-                                                        softWrap: true,
-                                                        overflow: TextOverflow
-                                                            .visible,
-                                                        textAlign: TextAlign
-                                                            .center, // ← Important aussi
-                                                      ),
-                                              ),
-                                            ),
-                                          ),
-                                        );
-                                      } else {
-                                        // valeur = formatNombreStr(
-                                        //   cle.toString(),
-                                        // );
-                                        return DataCell(
-                                          Padding(
-                                            padding: const EdgeInsets.all(5.0),
-                                            child: ConstrainedBox(
-                                              constraints: const BoxConstraints(
-                                                maxWidth: 150,
-                                                minHeight:
-                                                    40, // garantit que la hauteur minimum est suffisante
-                                              ),
-                                              child: Center(
-                                                child: Text(
-                                                  valeur,
-                                                  style: const TextStyle(
-                                                    fontSize: 12,
-                                                  ),
-                                                  softWrap: true,
-                                                  overflow:
-                                                      TextOverflow.visible,
-                                                  textAlign: TextAlign
-                                                      .center, // ← Important aussi
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        );
-                                      }
-                                    }
-                                  }).toList(),
-                                );
-                              }),
+  Future<void> _logiqVersement(int idC, montant) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
 
-                              // ✅ Ligne Grand Totaux
-                              // DataRow(
-                              //   color: WidgetStateProperty.all(
-                              //     Colors.grey[300],
-                              //   ),
-                              //   cells: cles.map((cle) {
-                              //     if (cle == 'offre') {
-                              //       return const DataCell(
-                              //         Padding(
-                              //           padding: EdgeInsets.all(5.0),
-                              //           child: Text(
-                              //             'Grand Totaux',
-                              //             style: TextStyle(
-                              //               fontWeight: FontWeight.bold,
-                              //               fontSize: 12,
-                              //             ),
-                              //           ),
-                              //         ),
-                              //       );
-                              //     } else if (cle == 'prixOffre') {
-                              //       final totalPaiement = straitants.fold<int>(
-                              //         0,
-                              //         (sum, row) {
-                              //           final int prix =
-                              //               int.tryParse(
-                              //                 row['prixOffre'].toString(),
-                              //               ) ??
-                              //               0;
-                              //           return sum + prix;
-                              //         },
-                              //       );
-                              //       return DataCell(
-                              //         Padding(
-                              //           padding: const EdgeInsets.all(5.0),
-                              //           child: Center(
-                              //             child: Text(
-                              //               formatNombreStr(
-                              //                 totalPaiement.toString(),
-                              //               ),
-                              //               style: const TextStyle(
-                              //                 fontWeight: FontWeight.bold,
-                              //               ),
-                              //             ),
-                              //           ),
-                              //         ),
-                              //       );
-                              //     } else if (cle == 'versement') {
-                              //       final totalPaiement = straitants.fold<int>(
-                              //         0,
-                              //         (sum, row) {
-                              //           final int prix =
-                              //               int.tryParse(
-                              //                 row['versement'].toString(),
-                              //               ) ??
-                              //               0;
-                              //           return sum + prix;
-                              //         },
-                              //       );
-                              //       return DataCell(
-                              //         Padding(
-                              //           padding: const EdgeInsets.all(5.0),
-                              //           child: Center(
-                              //             child: Text(
-                              //               formatNombreStr(
-                              //                 totalPaiement.toString(),
-                              //               ),
-                              //               style: const TextStyle(
-                              //                 fontWeight: FontWeight.bold,
-                              //               ),
-                              //             ),
-                              //           ),
-                              //         ),
-                              //       );
-                              //     } else if (cle == 'reste') {
-                              //       final totalPaiement = straitants.fold<int>(
-                              //         0,
-                              //         (sum, row) {
-                              //           final int prix =
-                              //               int.tryParse(
-                              //                 row['reste'].toString(),
-                              //               ) ??
-                              //               0;
-                              //           return sum + prix;
-                              //         },
-                              //       );
-                              //       return DataCell(
-                              //         Padding(
-                              //           padding: const EdgeInsets.all(5.0),
-                              //           child: Center(
-                              //             child: Text(
-                              //               formatNombreStr(
-                              //                 totalPaiement.toString(),
-                              //               ),
-                              //               style: const TextStyle(
-                              //                 fontWeight: FontWeight.bold,
-                              //               ),
-                              //             ),
-                              //           ),
-                              //         ),
-                              //       );
-                              //     } else if (cle == 'avances') {
-                              //       final totalPaiement = straitants.fold<int>(
-                              //         0,
-                              //         (sum, row) {
-                              //           final int prix =
-                              //               int.tryParse(
-                              //                 row['avances'].toString(),
-                              //               ) ??
-                              //               0;
-                              //           return sum + prix;
-                              //         },
-                              //       );
-                              //       return DataCell(
-                              //         Padding(
-                              //           padding: const EdgeInsets.all(5.0),
-                              //           child: Center(
-                              //             child: Text(
-                              //               formatNombreStr(
-                              //                 totalPaiement.toString(),
-                              //               ),
-                              //               style: const TextStyle(
-                              //                 fontWeight: FontWeight.bold,
-                              //               ),
-                              //             ),
-                              //           ),
-                              //         ),
-                              //       );
-                              //     } else {
-                              //       return const DataCell(Text(''));
-                              //     }
-                              //   }).toList(),
-                              // ),
-                            ],
-                          ),
-                        ],
+    try {
+      final body = {
+        "action": "versementContrat",
+        "idC": idC.toString(),
+        "montantVerser": montant,
+        "statut": _statut.toString(),
+      };
+
+      final res = await http
+          .post(
+            ConnBackend.connUrl,
+            headers: {"Content-Type": "application/json"},
+            body: jsonEncode(body),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      final data = jsonDecode(res.body);
+      if (!mounted) return;
+      // Navigator.pop(context); // Fermer le dialog
+      // Navigator.pop(context, true);
+
+      if (res.statusCode == 200 && data['success'] == true) {
+        _hasSaved = true;
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Versement effectué !',
+              // style: TextStyle(color: Colors.red),
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        final index = straitants.indexWhere((straitant) => straitant.id == idC);
+        if (index != -1) {
+          final ancien = straitants[index];
+          final modifie = Straitant(
+            id: ancien.id,
+            versement:
+                (int.parse(montant) + int.parse(straitants[index].versement))
+                    .toString(),
+            idProjet: straitants[index].idProjet,
+            offre: straitants[index].offre,
+            fonction: straitants[index].fonction,
+            tel: straitants[index].tel,
+            ouvrier: straitants[index].ouvrier,
+            prixOffre: straitants[index].prixOffre,
+            reste:
+                (int.parse(straitants[index].prixOffre) -
+                        (int.parse(montant) +
+                            int.parse(straitants[index].avances) +
+                            int.parse(straitants[index].versement)))
+                    .toString(),
+            avances: straitants[index].avances,
+            date_: straitants[index].date_,
+            delaiContrat: straitants[index].delaiContrat,
+            realisation: straitants[index].realisation,
+            statut: straitants[index].statut, // la nouvelle valeur
+            // ...copier les autres champs nécessaires
+          );
+          setState(() {
+            straitants[index] = modifie;
+            _montantPaie = '';
+          });
+        }
+      } else {
+        // if (!mounted) return;
+        Navigator.pop(context);
+        _showMessage(data['message']);
+      }
+    } on TimeoutException {
+      if (mounted) {
+        Navigator.pop(context);
+        _showMessage("Le serveur ne répond pas. Réessaye encore.");
+      }
+    } on SocketException {
+      if (mounted) {
+        Navigator.pop(context);
+        _showMessage(
+          "Pas de connexion Internet ou votre connexion est instable.",
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context); // Ferme le loader
+      _showMessage("Erreur lors du traitement ! $e");
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          Navigator.pop(context, _hasSaved);
+        }
+      },
+      child: ConnectionOverlayWatcher(
+        child: Scaffold(
+          appBar: AppBar(
+            title: Text(_ttle),
+            centerTitle: true,
+            actions: [
+              IconButton(
+                icon: Icon(Icons.add_circle_rounded),
+                onPressed: () => _navigateToNewOffre(),
+              ),
+            ],
+          ),
+          body: _loading
+              ? const Center(child: CircularProgressIndicator())
+              : Column(
+                  children: [
+                    Container(
+                      // width: double.infinity,
+                      width: MediaQuery.of(context).size.width * 1,
+                      padding: const EdgeInsets.all(10),
+                      color: Colors.grey[200],
+                      alignment: Alignment.center,
+                      child: Text(
+                        _typeOffre,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blueGrey,
+                          // color: Color(0xFF0D47A1),
+                        ),
                       ),
                     ),
-                  ),
+
+                    Expanded(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.vertical,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                        //  padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Column(
+                            // mainAxisAlignment: MainAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              SizedBox(height: 10),
+                              DataTable(
+                                border: TableBorder.all(color: Colors.black),
+                                columnSpacing: 3,
+                                headingRowColor: WidgetStateProperty.all(
+                                  Colors.blue[50],
+                                ),
+                                dataRowColor: WidgetStateColor.resolveWith(
+                                  (states) => Colors.grey[50]!,
+                                ),
+                                columns: colonnes.map((col) {
+                                  return DataColumn(
+                                    label: Padding(
+                                      padding: const EdgeInsets.all(8),
+                                      child: Text(
+                                        col,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                                rows: [
+                                  ...straitants.map((Straitant row) {
+                                    return DataRow(
+                                      cells: cles.map((cle) {
+                                        int index = cles.indexOf(cle);
+                                        String valeur = '';
+
+                                        switch (cle) {
+                                          case 'offre':
+                                            valeur = row.offre;
+                                            break;
+                                          case 'ouvrier':
+                                            valeur = row.ouvrier;
+                                            break;
+                                          case 'fonction':
+                                            valeur = row.fonction;
+                                            break;
+                                          case 'tel':
+                                            valeur = row.tel;
+                                            break;
+                                          case 'prixOffre':
+                                            valeur = formatNombreStr(
+                                              row.prixOffre.toString(),
+                                            );
+                                            break;
+                                          case 'versement':
+                                            valeur = formatNombreStr(
+                                              row.versement.toString(),
+                                            );
+                                            break;
+                                          case 'reste':
+                                            valeur = formatNombreStr(
+                                              row.reste.toString(),
+                                            );
+                                            break;
+                                          case 'avances':
+                                            valeur = formatNombreStr(
+                                              row.avances.toString(),
+                                            );
+                                            break;
+                                          case 'date_':
+                                            valeur = row.date_;
+                                            break;
+                                          case 'delaiContrat':
+                                            valeur = row.delaiContrat;
+                                            break;
+                                        }
+
+                                        if (index == 0 && cle == 'offre') {
+                                          return DataCell(
+                                            Padding(
+                                              padding: const EdgeInsets.only(
+                                                top: 5,
+                                                left: 2,
+                                                right: 2,
+                                                bottom: 2,
+                                              ),
+                                              child: ConstrainedBox(
+                                                constraints:
+                                                    const BoxConstraints(
+                                                      maxWidth: 170,
+                                                    ),
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      valeur,
+                                                      style: const TextStyle(
+                                                        fontSize: 12,
+                                                      ),
+                                                      softWrap: true,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                    ),
+                                                    Text(
+                                                      "Réalisé à ${row.realisation}%",
+                                                      style: const TextStyle(
+                                                        fontSize: 10,
+                                                        color: Color(
+                                                          0xFF0D47A1,
+                                                        ),
+                                                        fontStyle:
+                                                            FontStyle.italic,
+                                                        decoration:
+                                                            TextDecoration.none,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                            onTap: () {
+                                              txtShow = valeur;
+                                              _optionAction(
+                                                row,
+                                                row.id,
+                                                row.reste,
+                                                row.realisation,
+                                              );
+                                            },
+                                          );
+                                        } else {
+                                          if (cle == 'ouvrier') {
+                                            String fonction = row.fonction;
+
+                                            return DataCell(
+                                              Padding(
+                                                padding: const EdgeInsets.all(
+                                                  5.0,
+                                                ),
+                                                child: ConstrainedBox(
+                                                  constraints: const BoxConstraints(
+                                                    maxWidth: 150,
+                                                    minHeight:
+                                                        40, // garantit que la hauteur minimum est suffisante
+                                                  ),
+                                                  child: Center(
+                                                    child: fonction != ''
+                                                        ? Text(
+                                                            "$valeur\n($fonction)",
+                                                            style:
+                                                                const TextStyle(
+                                                                  fontSize: 12,
+                                                                ),
+                                                            softWrap: true,
+                                                            overflow:
+                                                                TextOverflow
+                                                                    .visible,
+                                                            textAlign: TextAlign
+                                                                .center, // ← Important aussi
+                                                          )
+                                                        : Text(
+                                                            valeur,
+                                                            style:
+                                                                const TextStyle(
+                                                                  fontSize: 11,
+                                                                ),
+                                                            softWrap: true,
+                                                            overflow:
+                                                                TextOverflow
+                                                                    .visible,
+                                                            textAlign: TextAlign
+                                                                .center, // ← Important aussi
+                                                          ),
+                                                  ),
+                                                ),
+                                              ),
+                                            );
+                                          } else {
+                                            // valeur = formatNombreStr(
+                                            //   cle.toString(),
+                                            // );
+                                            return DataCell(
+                                              Padding(
+                                                padding: const EdgeInsets.all(
+                                                  5.0,
+                                                ),
+                                                child: ConstrainedBox(
+                                                  constraints: const BoxConstraints(
+                                                    maxWidth: 150,
+                                                    minHeight:
+                                                        40, // garantit que la hauteur minimum est suffisante
+                                                  ),
+                                                  child: Center(
+                                                    child: Text(
+                                                      valeur,
+                                                      style: const TextStyle(
+                                                        fontSize: 12,
+                                                      ),
+                                                      softWrap: true,
+                                                      overflow:
+                                                          TextOverflow.visible,
+                                                      textAlign: TextAlign
+                                                          .center, // ← Important aussi
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            );
+                                          }
+                                        }
+                                      }).toList(),
+                                    );
+                                  }),
+
+                                  // ✅ Ligne Grand Totaux
+                                  // DataRow(
+                                  //   color: WidgetStateProperty.all(
+                                  //     Colors.grey[300],
+                                  //   ),
+                                  //   cells: cles.map((cle) {
+                                  //     if (cle == 'offre') {
+                                  //       return const DataCell(
+                                  //         Padding(
+                                  //           padding: EdgeInsets.all(5.0),
+                                  //           child: Text(
+                                  //             'Grand Totaux',
+                                  //             style: TextStyle(
+                                  //               fontWeight: FontWeight.bold,
+                                  //               fontSize: 12,
+                                  //             ),
+                                  //           ),
+                                  //         ),
+                                  //       );
+                                  //     } else if (cle == 'prixOffre') {
+                                  //       final totalPaiement = straitants.fold<int>(
+                                  //         0,
+                                  //         (sum, row) {
+                                  //           final int prix =
+                                  //               int.tryParse(
+                                  //                 row['prixOffre'].toString(),
+                                  //               ) ??
+                                  //               0;
+                                  //           return sum + prix;
+                                  //         },
+                                  //       );
+                                  //       return DataCell(
+                                  //         Padding(
+                                  //           padding: const EdgeInsets.all(5.0),
+                                  //           child: Center(
+                                  //             child: Text(
+                                  //               formatNombreStr(
+                                  //                 totalPaiement.toString(),
+                                  //               ),
+                                  //               style: const TextStyle(
+                                  //                 fontWeight: FontWeight.bold,
+                                  //               ),
+                                  //             ),
+                                  //           ),
+                                  //         ),
+                                  //       );
+                                  //     } else if (cle == 'versement') {
+                                  //       final totalPaiement = straitants.fold<int>(
+                                  //         0,
+                                  //         (sum, row) {
+                                  //           final int prix =
+                                  //               int.tryParse(
+                                  //                 row['versement'].toString(),
+                                  //               ) ??
+                                  //               0;
+                                  //           return sum + prix;
+                                  //         },
+                                  //       );
+                                  //       return DataCell(
+                                  //         Padding(
+                                  //           padding: const EdgeInsets.all(5.0),
+                                  //           child: Center(
+                                  //             child: Text(
+                                  //               formatNombreStr(
+                                  //                 totalPaiement.toString(),
+                                  //               ),
+                                  //               style: const TextStyle(
+                                  //                 fontWeight: FontWeight.bold,
+                                  //               ),
+                                  //             ),
+                                  //           ),
+                                  //         ),
+                                  //       );
+                                  //     } else if (cle == 'reste') {
+                                  //       final totalPaiement = straitants.fold<int>(
+                                  //         0,
+                                  //         (sum, row) {
+                                  //           final int prix =
+                                  //               int.tryParse(
+                                  //                 row['reste'].toString(),
+                                  //               ) ??
+                                  //               0;
+                                  //           return sum + prix;
+                                  //         },
+                                  //       );
+                                  //       return DataCell(
+                                  //         Padding(
+                                  //           padding: const EdgeInsets.all(5.0),
+                                  //           child: Center(
+                                  //             child: Text(
+                                  //               formatNombreStr(
+                                  //                 totalPaiement.toString(),
+                                  //               ),
+                                  //               style: const TextStyle(
+                                  //                 fontWeight: FontWeight.bold,
+                                  //               ),
+                                  //             ),
+                                  //           ),
+                                  //         ),
+                                  //       );
+                                  //     } else if (cle == 'avances') {
+                                  //       final totalPaiement = straitants.fold<int>(
+                                  //         0,
+                                  //         (sum, row) {
+                                  //           final int prix =
+                                  //               int.tryParse(
+                                  //                 row['avances'].toString(),
+                                  //               ) ??
+                                  //               0;
+                                  //           return sum + prix;
+                                  //         },
+                                  //       );
+                                  //       return DataCell(
+                                  //         Padding(
+                                  //           padding: const EdgeInsets.all(5.0),
+                                  //           child: Center(
+                                  //             child: Text(
+                                  //               formatNombreStr(
+                                  //                 totalPaiement.toString(),
+                                  //               ),
+                                  //               style: const TextStyle(
+                                  //                 fontWeight: FontWeight.bold,
+                                  //               ),
+                                  //             ),
+                                  //           ),
+                                  //         ),
+                                  //       );
+                                  //     } else {
+                                  //       return const DataCell(Text(''));
+                                  //     }
+                                  //   }).toList(),
+                                  // ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+        ),
+      ),
     );
   }
 }

@@ -15,6 +15,8 @@ class Straitant {
       reste,
       avances,
       date_,
+      delaiContrat,
+      realisation,
       statut;
 
   Straitant({
@@ -29,6 +31,8 @@ class Straitant {
     required this.reste,
     required this.avances,
     required this.date_,
+    required this.delaiContrat,
+    required this.realisation,
     required this.statut,
   });
 
@@ -50,6 +54,8 @@ class Straitant {
             .toString(),
     avances: e['avances'],
     date_: e['date_add'],
+    delaiContrat: e['delai_contrat'],
+    realisation: e['realisation'],
     statut: e['statut'],
   );
 }
