@@ -4,11 +4,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
-// import 'package:path_provider/path_provider.dart';
-// import 'package:pdf/pdf.dart';
-// import 'package:pdf/widgets.dart' as pw;
-// import 'package:printing/printing.dart';
-// import 'package:open_file/open_file.dart';
 
 import '../config/internet_verify.dart';
 import '../config/conn_backend.dart';
@@ -323,7 +318,7 @@ class _HistoPointageScreenState extends State<HistoPointageScreen> {
                                 ),
                               ),
 
-                              trailing: ElevatedButton.icon(
+                              trailing: IconButton(
                                 onPressed: () {
                                   final idPointage = o['id'].toString();
                                   final idOuvrier = o['idov'].toString();
@@ -347,24 +342,24 @@ class _HistoPointageScreenState extends State<HistoPointageScreen> {
                                   }
                                 },
                                 icon: const Icon(Icons.delete_forever),
-                                label: const Text(
-                                  "Supprimer",
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    // fontStyle: FontStyle.italic,
-                                  ),
-                                ),
+                                // label: const Text(
+                                //   "Supprimer",
+                                //   style: TextStyle(
+                                //     fontSize: 11,
+                                //     // fontStyle: FontStyle.italic,
+                                //   ),
+                                // ),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.deepOrange,
                                   foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 15,
-                                    vertical: 8,
-                                  ),
-                                  minimumSize: const Size(
-                                    80,
-                                    36,
-                                  ), // Largeur, Hauteur minimales
+                                  // padding: const EdgeInsets.symmetric(
+                                  //   horizontal: 15,
+                                  //   vertical: 8,
+                                  // ),
+                                  // minimumSize: const Size(
+                                  //   80,
+                                  //   36,
+                                  // ), // Largeur, Hauteur minimales
                                 ),
                               ),
                             ),

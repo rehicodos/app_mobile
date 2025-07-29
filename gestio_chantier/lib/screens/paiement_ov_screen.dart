@@ -122,6 +122,14 @@ class _PagePaiementOvStateAdm extends State<PagePaiementOv> {
                     backgroundColor: Colors.red,
                   ),
                 );
+              } else if (ctrl.text == "0") {
+                // if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Le contenu du champ ne doit etre 0 !'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
               } else if (ctrl.text != "") {
                 if (int.parse(ctrl.text) <= int.parse(ttalPaie)) {
                   FocusScope.of(context).unfocus();

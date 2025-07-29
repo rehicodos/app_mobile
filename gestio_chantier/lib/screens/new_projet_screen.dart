@@ -90,7 +90,7 @@ class NewProjetState extends State<NewProjet> {
         }),
       );
 
-      setState(() => isLoading = true);
+      setState(() => isLoading = false);
 
       final data = jsonDecode(response.body);
 
@@ -136,8 +136,9 @@ class NewProjetState extends State<NewProjet> {
         child: Scaffold(
           appBar: AppBar(
             title: const Text("Nouveau projet"),
+            centerTitle: true,
             // backgroundColor: Colors.blueAccent,
-            backgroundColor: Colors.blue[200],
+            // backgroundColor: Colors.blue[200],
           ),
           body: SingleChildScrollView(
             child: Form(
@@ -150,7 +151,7 @@ class NewProjetState extends State<NewProjet> {
                       "Renseignez les champs",
                       style: TextStyle(
                         fontSize: 20,
-                        color: Colors.blue,
+                        // color: Colors.blue,
                         fontWeight: FontWeight.bold,
                         // fontStyle: FontStyle.italic,
                       ),

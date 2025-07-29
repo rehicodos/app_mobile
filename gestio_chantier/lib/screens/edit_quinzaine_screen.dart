@@ -58,14 +58,46 @@ class EditQuinzaineState extends State<EditQuinzaine> {
 
   String _pad(int n) => n.toString().padLeft(2, '0');
 
+  // Future<void> _pickDateo({required bool isStart}) async {
+  //   DateTime initial = isStart ? _startDate : _endDate;
+
+  //   final picked = await showDatePicker(
+  //     context: context,
+  //     initialDate: initial,
+  //     firstDate: DateTime.now(),
+  //     lastDate: DateTime.now().add(Duration(days: 60)),
+  //   );
+
+  //   if (picked != null) {
+  //     setState(() {
+  //       if (isStart) {
+  //         _startDate = picked;
+  //         _updateEndDate();
+  //       } else {
+  //         _endDate = picked;
+  //         _endController.text = _formatDate(picked);
+  //       }
+  //     });
+  //   }
+  // }
+
   Future<void> _pickDate({required bool isStart}) async {
+    DateTime today = DateTime.now();
+    DateTime last = today.add(Duration(days: 60));
     DateTime initial = isStart ? _startDate : _endDate;
+
+    // ✅ Corriger si initialDate est hors plage
+    if (initial.isBefore(today)) {
+      initial = today;
+    } else if (initial.isAfter(last)) {
+      initial = last;
+    }
 
     final picked = await showDatePicker(
       context: context,
       initialDate: initial,
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(Duration(days: 60)),
+      firstDate: today,
+      lastDate: last,
     );
 
     if (picked != null) {

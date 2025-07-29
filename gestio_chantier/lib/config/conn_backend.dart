@@ -1,8 +1,8 @@
 class ConnBackend {
   // L'URL de base de l'API
   static const String _baseUrl =
-      // "http://serveur:8080/chantier_gestion_api/backend/traitement_api.php";
-      "http://192.168.1.4:8080/chantier_gestion_api/backend/traitement_api.php";
+      "https://aeliteco-ci.com/backapp/backend/traitement_api.php";
+  // "http://192.168.1.4:8080/chantier_gestion_api/backend/traitement_api.php";
 
   /// Retourne juste l'URL simple (utile pour POST)
   static Uri get connUrl => Uri.parse(_baseUrl);

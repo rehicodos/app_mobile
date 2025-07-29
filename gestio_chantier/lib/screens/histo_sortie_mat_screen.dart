@@ -13,8 +13,17 @@ import '../config/conn_backend.dart';
 
 class HistoSortieMatScreen extends StatefulWidget {
   final Projets projet;
+  final List pwd;
+  final String typeUser;
+  final String pwdUser;
 
-  const HistoSortieMatScreen({super.key, required this.projet});
+  const HistoSortieMatScreen({
+    super.key,
+    required this.projet,
+    required this.pwd,
+    required this.typeUser,
+    required this.pwdUser,
+  });
 
   @override
   State<HistoSortieMatScreen> createState() => _HistoSortieMatScreenState();
@@ -23,12 +32,14 @@ class HistoSortieMatScreen extends StatefulWidget {
 class _HistoSortieMatScreenState extends State<HistoSortieMatScreen> {
   List<SortieMatModel> sortieMat = [];
   bool _loading = true;
+  late List pwd_;
 
   Uri connUrl_ = ConnBackend.connUrl;
 
   @override
   void initState() {
     super.initState();
+    pwd_ = widget.pwd;
     _chargerHistoLivraisonMat();
   }
 
@@ -155,6 +166,143 @@ class _HistoSortieMatScreenState extends State<HistoSortieMatScreen> {
     }
   }
 
+  Future<void> _confirmSpAdmin({required VoidCallback onConfirmed}) async {
+    final ctrl = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Mdp admins'),
+        content: TextField(
+          controller: ctrl,
+          obscureText: true,
+          decoration: const InputDecoration(
+            labelText: 'Mot de passe admin ici ...',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () {
+              if (ctrl.text == pwd_[1] || ctrl.text == pwd_[2]) {
+                Navigator.pop(context, true);
+              } else if (ctrl.text == "") {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Le champ ne doit pas etre vide !'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              } else {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Mot de passe incorrect'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            // onPressed: () => Navigator.pop(context, ctrl.text == 'admin123'),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      onConfirmed();
+    }
+  }
+
+  Future<void> _confirmAdmins({required VoidCallback onConfirmed}) async {
+    final ctrl = TextEditingController();
+    // bool verify = false;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Saisi Mdp'),
+        content: TextField(
+          controller: ctrl,
+          obscureText: true,
+          decoration: const InputDecoration(labelText: 'Mot de passe ici ...'),
+        ),
+        actions: [
+          TextButton(
+            // onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () {
+              if (ctrl.text == "") {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Le champ ne doit pas etre vide !',
+                      // style: TextStyle(color: Colors.red),
+                    ),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              } else if (widget.typeUser == 'bureau') {
+                if (ctrl.text == pwd_[1] || ctrl.text == pwd_[2]) {
+                  Navigator.pop(context, true);
+                } else {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Mot de passe incorrect',
+                        // style: TextStyle(color: Colors.red),
+                      ),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              } else if (widget.typeUser == 'chantier') {
+                if (ctrl.text == widget.pwdUser) {
+                  Navigator.pop(context, true);
+                } else if (widget.pwdUser == '') {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Une erreur inconnue est survenue !',
+                        // style: TextStyle(color: Colors.red),
+                      ),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                } else {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Mot de passe incorrect',
+                        // style: TextStyle(color: Colors.red),
+                      ),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      onConfirmed();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return ConnectionOverlayWatcher(
@@ -166,7 +314,22 @@ class _HistoSortieMatScreenState extends State<HistoSortieMatScreen> {
             IconButton(
               icon: Icon(Icons.add_circle_rounded),
               onPressed: () {
-                _navigateToNewLivraisonMat();
+                if (widget.projet.statut == 'Terminé') {
+                  // if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Impossible, le projet est terminé',
+                        // style: TextStyle(color: Colors.red),
+                      ),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                } else {
+                  _confirmAdmins(
+                    onConfirmed: () => _navigateToNewLivraisonMat(),
+                  );
+                }
               },
             ),
           ],
@@ -470,7 +633,25 @@ class _HistoSortieMatScreenState extends State<HistoSortieMatScreen> {
                                 children: [
                                   ElevatedButton.icon(
                                     onPressed: () {
-                                      _navigateToEditLivraisonMat(r);
+                                      if (widget.projet.statut == 'Terminé') {
+                                        // if (!mounted) return;
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'Impossible, le projet est terminé',
+                                              // style: TextStyle(color: Colors.red),
+                                            ),
+                                            backgroundColor: Colors.red,
+                                          ),
+                                        );
+                                      } else {
+                                        _confirmAdmins(
+                                          onConfirmed: () =>
+                                              _navigateToEditLivraisonMat(r),
+                                        );
+                                      }
                                     },
                                     icon: const Icon(
                                       Icons.edit_square,
@@ -500,7 +681,9 @@ class _HistoSortieMatScreenState extends State<HistoSortieMatScreen> {
                                   ),
                                   ElevatedButton.icon(
                                     onPressed: () {
-                                      _deleteRapport(r.id);
+                                      _confirmSpAdmin(
+                                        onConfirmed: () => _deleteRapport(r.id),
+                                      );
                                     },
                                     icon: const Icon(
                                       Icons.delete_forever_rounded,

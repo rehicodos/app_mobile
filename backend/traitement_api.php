@@ -139,6 +139,9 @@
         case "update_quinzaine":
             updateQuinzaine($conn, $data);
             break;
+        case "delete_quinzaine":
+            deleteQuinzaine($conn, $data);
+            break;
         case "create_new_ov_pageQ":
             createWorkerDepuisQuinz($conn, $data);
             break;
@@ -912,6 +915,41 @@
         $stmt->close();
         $db_verify->close();
     }
+    function deleteQuinzaine($conn, $data) {
+
+        if (!isset($data['id'])) {
+            echo json_encode(["success" => false, "message" => "Données manquantes pour delete"]);
+            return;
+        }
+        $id0 = $data['id'];
+        $id = intval($data['id']);
+
+        $stmt4 = $conn->prepare("DELETE FROM tab_histo_paie_ouvrier WHERE id_quinzaine=?");
+        $stmt4->bind_param("s", $id0);
+        $stmt4->execute();
+        $stmt4->close(); 
+
+        $stmt5 = $conn->prepare("DELETE FROM tab_histo_pointage_ouvrier WHERE id_quinzaine=?");
+        $stmt5->bind_param("s", $id0);
+        $stmt5->execute();
+        $stmt5->close();
+
+        $stmt6 = $conn->prepare("DELETE FROM tab_ov_quinzaine WHERE id_quinzaine=?");
+        $stmt6->bind_param("s", $id0);
+        $stmt6->execute();
+        $stmt6->close();
+
+        $stmt = $conn->prepare("DELETE FROM tab_quinzaine WHERE id=?");
+        $stmt->bind_param("i", $id);
+
+        if ($stmt->execute()) {
+            echo json_encode(["success" => true, "message" => "Suppression effectuée !"]);
+        } else {
+            echo json_encode(["success" => false, "message" => "Échec suppression !"]);
+        }
+
+        $stmt->close();
+    }
 
     // Ouvrier 
     function listWorkersQuinzaine($conn, $id) {
@@ -1500,11 +1538,25 @@
         // echo json_encode(["success" => $stmt->execute()]);
     }
     function deleteWorkerQuinzaine($conn, $data) {
+
         if (!isset($data['id'])) {
             echo json_encode(["success" => false, "message" => "Données manquantes pour delete"]);
             return;
         }
+
+        $id0 = $data['id'];
         $id = intval($data['id']);
+
+        $stmt4 = $conn->prepare("DELETE FROM tab_histo_paie_ouvrier WHERE id_ouvrier=?");
+        $stmt4->bind_param("s", $id0);
+        $stmt4->execute();
+        $stmt4->close(); 
+
+        $stmt5 = $conn->prepare("DELETE FROM tab_histo_pointage_ouvrier WHERE id_ouvrier=?");
+        $stmt5->bind_param("s", $id0);
+        $stmt5->execute();
+        $stmt5->close();
+
         $stmt = $conn->prepare("DELETE FROM tab_ov_quinzaine WHERE id=?");
         $stmt->bind_param("i", $id);
 

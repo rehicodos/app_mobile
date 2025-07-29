@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../screens/admin_screen.dart';
@@ -129,20 +131,16 @@ class _Home0State extends State<Home0Screen> {
                 if (!mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text(
-                      'Le champ ne doit pas etre vide !',
-                      style: TextStyle(color: Colors.red),
-                    ),
+                    content: Text('Le champ ne doit pas etre vide !'),
+                    backgroundColor: Colors.red,
                   ),
                 );
               } else {
                 if (!mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text(
-                      'Mot de passe incorrect',
-                      style: TextStyle(color: Colors.red),
-                    ),
+                    content: Text('Mot de passe incorrect'),
+                    backgroundColor: Colors.red,
                   ),
                 );
               }
@@ -187,20 +185,16 @@ class _Home0State extends State<Home0Screen> {
                 if (!mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text(
-                      'Le champ ne doit pas etre vide !',
-                      style: TextStyle(color: Colors.red),
-                    ),
+                    content: Text('Le champ ne doit pas etre vide !'),
+                    backgroundColor: Colors.red,
                   ),
                 );
               } else {
                 if (!mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text(
-                      'Mot de passe incorrect',
-                      style: TextStyle(color: Colors.red),
-                    ),
+                    content: Text('Mot de passe incorrect'),
+                    backgroundColor: Colors.red,
                   ),
                 );
               }
@@ -218,27 +212,75 @@ class _Home0State extends State<Home0Screen> {
   }
 
   Future<void> _deleteProjet(int id) async {
-    final reponse = await http.post(
-      connUrl_,
-      headers: {"Content-Type": "application/json"},
-      body: jsonEncode({"action": "delete_projet", 'id': id.toString()}),
-    );
-    final reponseData = jsonDecode(reponse.body);
-    if (!mounted) return;
+    setState(() => _isLoading = true);
+    try {
+      final reponse = await http.post(
+        connUrl_,
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"action": "delete_projet", 'id': id.toString()}),
+      );
+
+      setState(() => _isLoading = false);
+      final data = jsonDecode(reponse.body);
+      if (!mounted) return;
+
+      if (data['success'] == true) {
+        showDialog(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Text('Info'),
+            content: Text(data['message']),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+        setState(() {
+          _filteredProjets.removeWhere((proj) => proj.id == id);
+          ttalProjet = _projets.length - 1;
+        });
+      } else {
+        _showErrorDialog(context, msg: data['message']);
+      }
+    } on SocketException {
+      setState(() => _isLoading = false);
+      _showErrorDialog(context);
+    } on TimeoutException {
+      setState(() => _isLoading = false);
+      _showErrorDialog(context, msg: "Une erreur est survenue !");
+    } catch (e) {
+      setState(() => _isLoading = false);
+      _showErrorDialog(context, msg: "Une erreur est survenue !");
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  void _showErrorDialog(BuildContext context, {String? msg}) {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Info'),
-        content: Text(reponseData['message']),
+        title: Text("Erreur ..."),
+        content: Text(
+          msg ?? "Impossible de mener l'action. Vérifiez votre connexion.",
+          style: TextStyle(color: Colors.red),
+        ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
+            onPressed: () {
+              // Navigator.of(context).popUntil(
+              //   (route) => route.isFirst,
+              // ); // Ferme tout sauf la première page
+              Navigator.of(context).pop();
+            },
+            child: Text("OK"),
           ),
         ],
       ),
     );
-    _loadWorkers();
   }
 
   void _onDelete(Projets w) {
@@ -248,8 +290,6 @@ class _Home0State extends State<Home0Screen> {
   void _addNewProjet() {
     _confirmAdmins(
       onConfirmed: () {
-        // Redirection vers un formulaire pré-rempli d'édition
-        // Navigator.push(context, MaterialPageRoute(builder: (_) => NewProjet()));
         _navigateToAjoutProjet();
       },
     );
@@ -258,11 +298,6 @@ class _Home0State extends State<Home0Screen> {
   void _onEdit(Projets w) {
     _confirmAdmins(
       onConfirmed: () {
-        // Redirection vers un formulaire pré-rempli d'édition
-        // Navigator.push(
-        //   context,
-        //   MaterialPageRoute(builder: (_) => EditProjet(projets: w)),
-        // );
         _navigateToEditProjet(w);
       },
     );
@@ -277,6 +312,177 @@ class _Home0State extends State<Home0Screen> {
     if (result == true) {
       getPasswords(); // 🔁 Recharge la liste si un projet a été ajouté
     }
+  }
+
+  void _optionVisionnage(w, projet) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        alignment:
+            Alignment.center, // Centrage du dialog lui-même (Flutter 3.7+)
+        title: const Center(
+          child: Text("Type visionneur", textAlign: TextAlign.center),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.of(context).pop();
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ChantierScreen(
+                      projet: w,
+                      pwd: _pwdData,
+                      typeUser: 'bureau',
+                      pwdUser: '',
+                    ),
+                  ),
+                );
+              },
+              // icon: const Icon(Icons.add_circle_outline),
+              label: const Text("Personnel bureau"),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFF0D47A1),
+                foregroundColor: Colors.white,
+              ),
+            ),
+            ElevatedButton.icon(
+              onPressed: () {
+                // Navigator.of(context).pop();
+                __visionnageWithAction(w, projet);
+              },
+              // icon: const Icon(Icons.delete_forever_rounded),
+              label: const Text("Personnel chantier"),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFF0D47A1),
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> __visionnageWithAction(w, projet, {String pwdM = ''}) async {
+    final TextEditingController controller = TextEditingController(text: pwdM);
+    final ctrl = controller;
+    // bool verify = false;
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        scrollable: true, // ✅ ajoute cette ligne
+        title: const Center(
+          child: Text("Authentifiez-vous", textAlign: TextAlign.center),
+        ),
+        content: TextField(
+          controller: ctrl,
+          obscureText: true,
+          keyboardType: TextInputType.text,
+          decoration: const InputDecoration(
+            labelText: 'Tapez votre mot de passe',
+          ),
+        ),
+        actions: [
+          TextButton(
+            // onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () async {
+              if (ctrl.text == "") {
+                // if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Le champ ne doit pas etre vide !'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              } else if (ctrl.text != "") {
+                // FocusScope.of(context).unfocus();
+                // Navigator.pop(context, true);
+
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (_) =>
+                      const Center(child: CircularProgressIndicator()),
+                );
+
+                try {
+                  final body = {
+                    "action": "verifyPwdUsers",
+                    "pwd_user": ctrl.text,
+                    "projet": projet,
+                  };
+
+                  final res = await http
+                      .post(
+                        ConnBackend.connUrl,
+                        headers: {"Content-Type": "application/json"},
+                        body: jsonEncode(body),
+                      )
+                      .timeout(const Duration(seconds: 10));
+
+                  final data = jsonDecode(res.body);
+                  if (!mounted) return;
+                  Navigator.pop(context);
+                  if (data['success'] == true) {
+                    Navigator.pop(context);
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ChantierScreen(
+                          projet: w,
+                          pwd: _pwdData,
+                          typeUser: 'chantier',
+                          pwdUser: ctrl.text,
+                        ),
+                      ),
+                    );
+                  } else {
+                    Navigator.pop(context);
+                    // Navigator.pop(context);
+                    _showMessage(data['message']);
+                  }
+                } on TimeoutException {
+                  if (mounted) {
+                    Navigator.pop(context);
+                    _showMessage("Le serveur ne répond pas. Réessaye encore.");
+                  }
+                } on SocketException {
+                  if (mounted) {
+                    Navigator.pop(context);
+                    _showMessage(
+                      "Pas de connexion Internet ou votre connexion est instable.",
+                    );
+                  }
+                } catch (e) {
+                  if (!mounted) return;
+                  Navigator.pop(context); // Ferme le loader
+                  _showMessage("Erreur lors du traitement ! $e");
+                }
+              }
+            },
+            // onPressed: () => Navigator.pop(context, ctrl.text == 'admin123'),
+            child: const Text('Valider'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showMessage(String msg, {bool success = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: success ? Colors.green : Colors.red,
+      ),
+    );
   }
 
   @override
@@ -312,6 +518,10 @@ class _Home0State extends State<Home0Screen> {
 
         body: _isLoading
             ? const Center(child: CircularProgressIndicator())
+            : _filteredProjets.isEmpty
+            ? const Center(
+                child: Text("Aucun projet enregistré pour l'instant."),
+              )
             : RefreshIndicator(
                 onRefresh: _loadWorkers,
                 child: Column(
@@ -385,7 +595,11 @@ class _Home0State extends State<Home0Screen> {
                           ),
                           GestureDetector(
                             onTap: () {
-                              _navigateToHistoChefChantier();
+                              _confirmSpAdmin(
+                                onConfirmed: () {
+                                  _navigateToHistoChefChantier();
+                                },
+                              );
                             },
                             child: const Column(
                               mainAxisSize: MainAxisSize.min,
@@ -586,7 +800,7 @@ class _Home0State extends State<Home0Screen> {
                           final w = _filteredProjets[i];
                           String nom = w.nom;
                           return Container(
-                            height: 48,
+                            // height: 48,
 
                             // padding: EdgeInsets.only(left: 15),
                             decoration: BoxDecoration(
@@ -600,109 +814,131 @@ class _Home0State extends State<Home0Screen> {
                             ),
 
                             child: Row(
-                              // mainAxisAlignment: MainAxisAlignment.center,
                               // mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Expanded(
-                                  child: ListView(
-                                    scrollDirection: Axis.horizontal,
+                                Container(
+                                  decoration: BoxDecoration(
+                                    border: Border(
+                                      right: BorderSide(
+                                        color: Colors.black,
+                                        width: 0.8,
+                                      ),
+                                    ),
+                                  ),
+                                  padding: EdgeInsets.only(
+                                    left: 15,
+                                    top: 6,
+                                    right: 10,
+                                  ),
+                                  width:
+                                      MediaQuery.of(context).size.width * 0.52,
+                                  // color: Colors.blue,
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      SizedBox(
-                                        width: MediaQuery.of(
-                                          context,
-                                        ).size.width,
-                                        child: Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Container(
-                                              padding: EdgeInsets.only(
-                                                left: 15,
-                                                top: 6,
-                                              ),
-                                              // color: Colors.blue,
-                                              child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    "$nom,",
-                                                    style: TextStyle(
-                                                      fontSize: 15,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      color: Colors.black,
-                                                      // letterSpacing: 1.2,
-                                                      // fontStyle: FontStyle.italic,
-                                                    ),
-                                                  ),
-                                                  Text(
-                                                    w.statut,
-                                                    style: TextStyle(
-                                                      fontSize: 11,
-                                                      color:
-                                                          const Color.fromARGB(
-                                                            255,
-                                                            1,
-                                                            45,
-                                                            81,
-                                                          ),
-                                                      // letterSpacing: 1.2,
-                                                      fontStyle:
-                                                          FontStyle.italic,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                            Row(
-                                              children: [
-                                                TextButton.icon(
-                                                  onPressed: () {
-                                                    // String nomch = w.nom;
-                                                    Navigator.push(
-                                                      context,
-                                                      MaterialPageRoute(
-                                                        builder: (context) =>
-                                                            ChantierScreen(
-                                                              projet: w,
-                                                              adm: pwd,
-                                                              admSuper:
-                                                                  pwdSuper,
-                                                            ),
-                                                      ),
-                                                    );
-                                                  },
-                                                  label: Icon(
-                                                    Icons
-                                                        .remove_red_eye_outlined,
-                                                    size: 25,
-                                                    color: Colors.green,
-                                                  ),
-                                                ),
-                                                TextButton.icon(
-                                                  onPressed: () => _onEdit(w),
-                                                  label: Icon(
-                                                    Icons.edit_square,
-                                                    size: 25,
-                                                    color: Colors.green,
-                                                  ),
-                                                ),
-                                                TextButton.icon(
-                                                  onPressed: () => _onDelete(w),
-                                                  label: Icon(
-                                                    Icons.delete_forever,
-                                                    size: 25,
-                                                    color: Colors.red,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ],
+                                      Text(
+                                        "$nom,",
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.black,
+                                          // letterSpacing: 1.2,
+                                          // fontStyle: FontStyle.italic,
+                                        ),
+                                      ),
+                                      Text(
+                                        w.statut,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: w.statut == 'En cours'
+                                              ? const Color.fromARGB(
+                                                  255,
+                                                  1,
+                                                  45,
+                                                  81,
+                                                )
+                                              : Colors.orange,
+                                          // letterSpacing: 1.2,
+                                          fontStyle: FontStyle.italic,
                                         ),
                                       ),
                                     ],
                                   ),
+                                ),
+                                Row(
+                                  children: [
+                                    TextButton.icon(
+                                      onPressed: () {
+                                        // String nomch = w.nom;
+                                        _optionVisionnage(w, w.nom);
+                                      },
+                                      label: Icon(
+                                        Icons.remove_red_eye_outlined,
+                                        size: 25,
+                                        color: Colors.green,
+                                      ),
+                                      style: TextButton.styleFrom(
+                                        padding: EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 4,
+                                        ),
+                                        // minimumSize: Size(10, 30),
+                                        tapTargetSize:
+                                            MaterialTapTargetSize.shrinkWrap,
+                                      ),
+                                    ),
+                                    TextButton.icon(
+                                      onPressed: () {
+                                        if (w.statut != 'En cours') {
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                "Impossible de modifier, le projet a pris fin !",
+                                              ),
+                                              backgroundColor: Colors.red,
+                                            ),
+                                          );
+                                        } else {
+                                          _onEdit(w);
+                                        }
+                                      },
+                                      label: Icon(
+                                        Icons.edit_square,
+                                        size: 25,
+                                        color: Colors.green,
+                                      ),
+                                      style: TextButton.styleFrom(
+                                        padding: EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 4,
+                                        ),
+                                        minimumSize: Size(10, 30),
+                                        tapTargetSize:
+                                            MaterialTapTargetSize.shrinkWrap,
+                                      ),
+                                    ),
+                                    TextButton.icon(
+                                      onPressed: () => _onDelete(w),
+                                      label: Icon(
+                                        Icons.delete_forever,
+                                        size: 25,
+                                        color: Colors.red,
+                                      ),
+                                      style: TextButton.styleFrom(
+                                        padding: EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 4,
+                                        ),
+                                        // minimumSize: Size(10, 30),
+                                        tapTargetSize:
+                                            MaterialTapTargetSize.shrinkWrap,
+                                        // elevation: 1,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),

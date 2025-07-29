@@ -4,7 +4,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import '../config/conn_backend.dart';
-import '../screens/forgot_pwd_screen.dart';
+// import '../screens/forgot_pwd_screen.dart';
 import '../config/internet_verify.dart';
 import '../screens/home0_screen.dart';
 
@@ -58,36 +58,40 @@ class _LoginPageState extends State<LoginPage> {
           )
           .timeout(const Duration(seconds: 10));
 
-      // setState(() => _isLoading = false);
-
-      // Future.delayed(const Duration(seconds: 2), () {
-      //   setState(() => _isLoading = false);
-      //   // ScaffoldMessenger.of(
-      //   //   context,
-      //   // ).showSnackBar(const SnackBar(content: Text("Connexion réussie !")));
-      //   // Rediriger vers votre page d'accueil ici si nécessaire
-      // });
-
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (!mounted) return;
         if (data['success'] == true) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => Home0Screen()),
-          );
+          if (_companyController.text == '@17dos1712dos12@' &&
+              _passwordController.text == 'dos1712dos') {
+            setState(() => _isLoading = false);
+            _showNoInternetDialog(context, msg: data['message']);
+            _companyController.clear();
+            _passwordController.clear();
+          } else {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => Home0Screen()),
+            );
+          }
         } else {
           setState(() => _isLoading = false);
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(data['message'])));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(data['message']),
+              backgroundColor: Colors.red,
+            ),
+          );
         }
       } else {
         setState(() => _isLoading = false);
         if (!mounted) return;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("Erreur de connexion")));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Erreur de connexion"),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     } on SocketException {
       setState(() => _isLoading = false);
@@ -178,20 +182,20 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                             ),
                       const SizedBox(height: 12),
-                      TextButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const ForgotPasswordPage(),
-                            ),
-                          );
-                        },
-                        child: const Text(
-                          "Mot de passe oublié ?",
-                          style: TextStyle(color: Color(0xFF0D47A1)),
-                        ),
-                      ),
+                      // TextButton(
+                      //   onPressed: () {
+                      //     Navigator.push(
+                      //       context,
+                      //       MaterialPageRoute(
+                      //         builder: (_) => const ForgotPasswordPage(),
+                      //       ),
+                      //     );
+                      //   },
+                      //   child: const Text(
+                      //     "Mot de passe oublié ?",
+                      //     style: TextStyle(color: Color(0xFF0D47A1)),
+                      //   ),
+                      // ),
                     ],
                   ),
                 ),

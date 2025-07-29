@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
@@ -9,7 +11,6 @@ import '../screens/histo_rapport_jr_screen.dart';
 import '../screens/feuille_straitant_screen.dart';
 import '../config/internet_verify.dart';
 import '../screens/edit_quinzaine_screen.dart';
-import '../models/pwds.dart';
 import '../config/conn_backend.dart';
 import '../models/projet_model.dart';
 import '../screens/add_quinzaine_screen.dart';
@@ -18,14 +19,16 @@ import '../models/quinzaine_model.dart';
 
 class ChantierScreen extends StatefulWidget {
   final Projets projet;
-  final String adm;
-  final String admSuper;
+  final List pwd;
+  final String typeUser;
+  final String pwdUser;
 
   const ChantierScreen({
     super.key,
     required this.projet,
-    required this.adm,
-    required this.admSuper,
+    required this.pwd,
+    required this.typeUser,
+    required this.pwdUser,
   });
 
   @override
@@ -35,11 +38,10 @@ class ChantierScreen extends StatefulWidget {
 class _ChantierScreenState extends State<ChantierScreen> {
   List<Quinzaine> _quinzaines = [];
   late List pwd_;
-  late String pwd;
-  late String pwdSuper;
-  late String pwdChefCh;
   late int ttalQuinzaine = 0;
   bool _isLoading = true;
+
+  String _statut = '';
 
   final TextEditingController _searchController = TextEditingController();
   List<Quinzaine> _filteredQuinzaines = []; // Liste filtrée à afficher
@@ -73,14 +75,10 @@ class _ChantierScreenState extends State<ChantierScreen> {
   @override
   void initState() {
     super.initState();
+    pwd_ = widget.pwd;
+    _statut = widget.projet.statut;
     _loadQuinzaines();
     _searchController.addListener(_filterProjets);
-    // _searchController.addListener(() {
-    //   _filterProjets(); // filtre les projets selon la recherche
-    //   setState(
-    //     () {},
-    //   ); // force l'affichage/mise à jour de l'UI (ex : bouton "✖")
-    // });
   }
 
   void _filterProjets() {
@@ -107,25 +105,6 @@ class _ChantierScreenState extends State<ChantierScreen> {
       ttalQuinzaine = _quinzaines.length;
       _isLoading = false;
     });
-    getPasswords();
-  }
-
-  Future<Pwds?> _pwds() async {
-    final url_ = ConnBackend.withParams({"action": "pwds"});
-    final resp_ = await http.get(url_);
-    final jsonData = jsonDecode(resp_.body);
-    return Pwds.fromJson(jsonData);
-  }
-
-  void getPasswords() async {
-    final pwds = await _pwds();
-    pwd = pwds!.pwdAd;
-    pwdSuper = pwds.pwdSAd;
-    pwdChefCh = pwds.pwdChefCh;
-    pwd_ = [pwdChefCh, pwd, pwdSuper];
-
-    // if (!mounted) return;
-    // _showPwds(context, msg: pwdSuper);
   }
 
   Future<void> _confirmSpAdmin({required VoidCallback onConfirmed}) async {
@@ -133,7 +112,7 @@ class _ChantierScreenState extends State<ChantierScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Mdp super admin'),
+        title: const Text('Mdp admins'),
         content: TextField(
           controller: ctrl,
           obscureText: true,
@@ -148,26 +127,22 @@ class _ChantierScreenState extends State<ChantierScreen> {
           ),
           TextButton(
             onPressed: () {
-              if (ctrl.text == pwdSuper) {
+              if (ctrl.text == pwd_[1] || ctrl.text == pwd_[2]) {
                 Navigator.pop(context, true);
               } else if (ctrl.text == "") {
                 if (!mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text(
-                      'Le champ ne doit pas etre vide !',
-                      style: TextStyle(color: Colors.red),
-                    ),
+                    content: Text('Le champ ne doit pas etre vide !'),
+                    backgroundColor: Colors.red,
                   ),
                 );
               } else {
                 if (!mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text(
-                      'Mot de passe incorrect',
-                      style: TextStyle(color: Colors.red),
-                    ),
+                    content: Text('Mot de passe incorrect'),
+                    backgroundColor: Colors.red,
                   ),
                 );
               }
@@ -190,13 +165,11 @@ class _ChantierScreenState extends State<ChantierScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Mdp admins'),
+        title: const Text('Saisi Mdp'),
         content: TextField(
           controller: ctrl,
           obscureText: true,
-          decoration: const InputDecoration(
-            labelText: 'Mot de passe admin ici ...',
-          ),
+          decoration: const InputDecoration(labelText: 'Mot de passe ici ...'),
         ),
         actions: [
           TextButton(
@@ -206,11 +179,7 @@ class _ChantierScreenState extends State<ChantierScreen> {
           ),
           TextButton(
             onPressed: () {
-              if (ctrl.text == pwd ||
-                  ctrl.text == pwdSuper ||
-                  ctrl.text == pwdChefCh) {
-                Navigator.pop(context, true);
-              } else if (ctrl.text == "") {
+              if (ctrl.text == "") {
                 if (!mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
@@ -221,20 +190,49 @@ class _ChantierScreenState extends State<ChantierScreen> {
                     backgroundColor: Colors.red,
                   ),
                 );
-              } else {
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'Mot de passe incorrect',
-                      // style: TextStyle(color: Colors.red),
+              } else if (widget.typeUser == 'bureau') {
+                if (ctrl.text == pwd_[1] || ctrl.text == pwd_[2]) {
+                  Navigator.pop(context, true);
+                } else {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Mot de passe incorrect',
+                        // style: TextStyle(color: Colors.red),
+                      ),
+                      backgroundColor: Colors.red,
                     ),
-                    backgroundColor: Colors.red,
-                  ),
-                );
+                  );
+                }
+              } else if (widget.typeUser == 'chantier') {
+                if (ctrl.text == widget.pwdUser) {
+                  Navigator.pop(context, true);
+                } else if (widget.pwdUser == '') {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Une erreur inconnue est survenue !',
+                        // style: TextStyle(color: Colors.red),
+                      ),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                } else {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Mot de passe incorrect',
+                        // style: TextStyle(color: Colors.red),
+                      ),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
               }
             },
-            // onPressed: () => Navigator.pop(context, ctrl.text == 'admin123'),
             child: const Text('OK'),
           ),
         ],
@@ -247,27 +245,37 @@ class _ChantierScreenState extends State<ChantierScreen> {
   }
 
   Future<void> _deleteProjet(int id) async {
-    final reponse = await http.post(
-      connUrl_,
-      headers: {"Content-Type": "application/json"},
-      body: jsonEncode({"action": "delete_quinzzaine", 'id': id.toString()}),
-    );
-    final reponseData = jsonDecode(reponse.body);
-    if (!mounted) return;
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Info'),
-        content: Text(reponseData['message']),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
-    _loadQuinzaines();
+    setState(() => _isLoading = true);
+    try {
+      final reponse = await http.post(
+        connUrl_,
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"action": "delete_quinzaine", 'id': id.toString()}),
+      );
+
+      setState(() => _isLoading = false);
+      final data = jsonDecode(reponse.body);
+      if (!mounted) return;
+      if (data['success'] == true) {
+        setState(() {
+          _filteredQuinzaines.removeWhere((quinz) => quinz.id == id);
+          ttalQuinzaine = _filteredQuinzaines.length;
+        });
+      } else {
+        _showErrorDialog(context, msg: data['message']);
+      }
+    } on SocketException {
+      setState(() => _isLoading = false);
+      _showErrorDialog(context);
+    } on TimeoutException {
+      setState(() => _isLoading = false);
+      _showErrorDialog(context, msg: "Une erreur est survenue !");
+    } catch (e) {
+      setState(() => _isLoading = false);
+      _showErrorDialog(context, msg: "Une erreur est survenue !");
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 
   void _onDelete(Quinzaine w) {
@@ -291,6 +299,25 @@ class _ChantierScreenState extends State<ChantierScreen> {
           _navigateToEditProjet(w);
         },
       );
+    } else if (!isQuinzaineActive(w)) {
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: Text("Erreur ..."),
+          content: Text(
+            "Impossible, la session est terminée !",
+            style: TextStyle(color: Colors.red),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text("OK"),
+            ),
+          ],
+        ),
+      );
     } else {
       showDialog(
         context: context,
@@ -312,10 +339,6 @@ class _ChantierScreenState extends State<ChantierScreen> {
       );
     }
   }
-
-  // bool verifyStatutQ(Quinzaine q) {
-  //   return q.statut.toLowerCase() == "en cours";
-  // }
 
   bool isQuinzaineActive(Quinzaine q) {
     final format = DateFormat('dd-MM-yyyy'); // adapte selon ton format
@@ -352,6 +375,9 @@ class _ChantierScreenState extends State<ChantierScreen> {
                     builder: (context) => FeuilleSousTraitant(
                       projet: widget.projet,
                       typeOffre: 'straitant',
+                      pwd: widget.pwd,
+                      typeUser: widget.typeUser,
+                      pwdUser: widget.pwdUser,
                     ),
                   ),
                 );
@@ -372,6 +398,9 @@ class _ChantierScreenState extends State<ChantierScreen> {
                     builder: (context) => FeuilleSousTraitant(
                       projet: widget.projet,
                       typeOffre: 'prestation',
+                      pwd: widget.pwd,
+                      typeUser: widget.typeUser,
+                      pwdUser: widget.pwdUser,
                     ),
                   ),
                 );
@@ -407,8 +436,12 @@ class _ChantierScreenState extends State<ChantierScreen> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) =>
-                        HistoLivraisonMatScreen(projet: widget.projet),
+                    builder: (context) => HistoLivraisonMatScreen(
+                      projet: widget.projet,
+                      pwd: widget.pwd,
+                      typeUser: widget.typeUser,
+                      pwdUser: widget.pwdUser,
+                    ),
                   ),
                 );
               },
@@ -425,8 +458,12 @@ class _ChantierScreenState extends State<ChantierScreen> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) =>
-                        HistoSortieMatScreen(projet: widget.projet),
+                    builder: (context) => HistoSortieMatScreen(
+                      projet: widget.projet,
+                      pwd: widget.pwd,
+                      typeUser: widget.typeUser,
+                      pwdUser: widget.pwdUser,
+                    ),
                   ),
                 );
               },
@@ -439,6 +476,95 @@ class _ChantierScreenState extends State<ChantierScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _finProjet() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        alignment:
+            Alignment.center, // Centrage du dialog lui-même (Flutter 3.7+)
+        title: const Center(
+          child: Text("Gérer statut projet", textAlign: TextAlign.center),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _confirmSpAdmin(onConfirmed: () => _logiqFinProjet());
+              },
+              // icon: const Icon(Icons.engineering),
+              label: const Text("Basculer"),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFF0D47A1),
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _logiqFinProjet() async {
+    setState(() => _isLoading = true);
+    try {
+      final reponse = await http.post(
+        connUrl_,
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "action": "fin_projet",
+          'id': widget.projet.id.toString(),
+          'statut': widget.projet.statut,
+        }),
+      );
+
+      setState(() => _isLoading = false);
+      final data = jsonDecode(reponse.body);
+      if (!mounted) return;
+
+      if (data['success'] == true) {
+        setState(() {
+          _statut = _statut == 'En cours' ? 'Terminé' : 'En cours';
+        });
+      } else {
+        _showErrorDialog(context, msg: data['message']);
+      }
+    } on SocketException {
+      setState(() => _isLoading = false);
+      _showErrorDialog(context);
+    } on TimeoutException {
+      setState(() => _isLoading = false);
+      _showErrorDialog(context, msg: "Une erreur est survenue !");
+    } catch (e) {
+      setState(() => _isLoading = false);
+      _showErrorDialog(context, msg: "Une erreur est survenue !");
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  void _showErrorDialog(BuildContext context, {String? msg}) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text("Erreur ..."),
+        content: Text(
+          msg ?? "Impossible de mener l'action. Vérifiez votre connexion.",
+          style: TextStyle(color: Colors.red),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+            child: Text("OK"),
+          ),
+        ],
       ),
     );
   }
@@ -488,7 +614,20 @@ class _ChantierScreenState extends State<ChantierScreen> {
                         children: [
                           GestureDetector(
                             onTap: () {
-                              _addNewProjet();
+                              if (_statut == 'Terminé') {
+                                // if (!mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Impossible, le projet est terminé',
+                                      // style: TextStyle(color: Colors.red),
+                                    ),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              } else {
+                                _addNewProjet();
+                              }
                             },
                             child: const Column(
                               mainAxisSize: MainAxisSize.min,
@@ -539,6 +678,9 @@ class _ChantierScreenState extends State<ChantierScreen> {
                                 MaterialPageRoute(
                                   builder: (context) => HistoRapportJrScreen(
                                     projet: widget.projet,
+                                    pwd: widget.pwd,
+                                    typeUser: widget.typeUser,
+                                    pwdUser: widget.pwdUser,
                                   ),
                                   // NewRapport(projet: widget.projet),
                                 ),
@@ -564,17 +706,8 @@ class _ChantierScreenState extends State<ChantierScreen> {
                               ],
                             ),
                           ),
-
                           GestureDetector(
                             onTap: () {
-                              // Navigator.push(
-                              //   context,
-                              //   MaterialPageRoute(
-                              //     builder: (context) => FeuilleSousTraitant(
-                              //       projet: widget.projet,
-                              //     ),
-                              //   ),
-                              // );
                               _optionStraitPrestation();
                             },
                             child: const Column(
@@ -602,6 +735,10 @@ class _ChantierScreenState extends State<ChantierScreen> {
                                 MaterialPageRoute(
                                   builder: (context) => PageOuvrierProjet(
                                     idProjet: widget.projet.id.toString(),
+                                    pwd: widget.pwd,
+                                    typeUser: widget.typeUser,
+                                    pwdUser: widget.pwdUser,
+                                    statut: widget.projet.statut,
                                   ),
                                 ),
                               );
@@ -653,55 +790,29 @@ class _ChantierScreenState extends State<ChantierScreen> {
                               // fontStyle: FontStyle.italic, // Texte en italique
                             ),
                           ),
-                          SizedBox(
-                            // width: 60,
-                            height: 18,
-                            child: TextButton(
-                              onPressed: () {},
-                              style: ButtonStyle(
-                                padding: WidgetStateProperty.all(
-                                  EdgeInsets.zero,
-                                ),
-                                minimumSize: WidgetStateProperty.all(Size.zero),
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              ),
-                              child: Text(
-                                widget.projet.statut,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Color(0xFF0D47A1),
-                                  fontStyle: FontStyle.italic,
-                                ),
+                          TextButton(
+                            onPressed: () {
+                              _finProjet();
+                            },
+                            style: ButtonStyle(
+                              padding: WidgetStateProperty.all(EdgeInsets.zero),
+                              minimumSize: WidgetStateProperty.all(Size.zero),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: Text(
+                              _statut,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: _statut == 'En cours'
+                                    ? Color(0xFF0D47A1)
+                                    : Colors.orange,
+                                fontStyle: FontStyle.italic,
                               ),
                             ),
                           ),
-                          // TextButton(
-                          //   onPressed: () {},
-                          //   style: TextButton.styleFrom(
-                          //     padding: EdgeInsets.symmetric(
-                          //       horizontal: 8,
-                          //       vertical: 4,
-                          //     ), // réduit le padding
-                          //     minimumSize: Size(
-                          //       0,
-                          //       0,
-                          //     ), // supprime la taille minimum par défaut
-                          //     tapTargetSize: MaterialTapTargetSize
-                          //         .shrinkWrap, // réduit la zone de clic
-                          //   ),
-                          //   child: Text(
-                          //     widget.projet.statut,
-                          //     style: TextStyle(
-                          //       fontSize: 11,
-                          //       // fontWeight: FontWeight.bold,
-                          // color: Colors.yellow,
-                          // fontStyle: FontStyle.italic, // Texte en italique
-                          //     ),
-                          //   ),
-                          // ),
-                          // SizedBox(height: 1),
+
                           Text(
-                            "Bdg MO: ${widget.projet.bdgmo} f, Dép.: 00 f, Reste: ${widget.projet.bdgmo} f",
+                            "Bdg MO: ${widget.projet.bdgmo} f, Dép.: ${widget.projet.depense} f, Reste: ${widget.projet.reste} f",
                             style: TextStyle(
                               fontSize: 11,
                               // fontWeight: FontWeight.bold,
@@ -727,177 +838,202 @@ class _ChantierScreenState extends State<ChantierScreen> {
                     ),
 
                     // Liste scrollable
-                    Expanded(
-                      child: ListView.builder(
-                        itemCount: _filteredQuinzaines.length,
-                        itemBuilder: (_, i) {
-                          final w = _filteredQuinzaines[i];
-                          // String nom = w.periode;
-                          return Container(
-                            height: 73,
-                            // margin: EdgeInsets.only(left: 5, right: 5),
-                            decoration: BoxDecoration(
-                              border: Border(
-                                bottom: BorderSide(
-                                  color: Colors.black,
-                                  width: 0.8,
-                                ),
-                              ),
-                              // color: Colors.grey[50],
-                              color: Colors.white,
+                    _filteredQuinzaines.isEmpty
+                        ? Container(
+                            alignment: Alignment.center,
+                            padding: EdgeInsets.all(20),
+                            color: Colors.white,
+                            child: Text(
+                              "Aucune Session enregistrée pour l'instant.",
                             ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: ListView(
-                                    scrollDirection: Axis.horizontal,
-
+                          )
+                        : Expanded(
+                            child: ListView.builder(
+                              itemCount: _filteredQuinzaines.length,
+                              itemBuilder: (_, i) {
+                                final w = _filteredQuinzaines[i];
+                                // String nom = w.periode;
+                                return Container(
+                                  height: 73,
+                                  // margin: EdgeInsets.only(left: 5, right: 5),
+                                  decoration: BoxDecoration(
+                                    border: Border(
+                                      bottom: BorderSide(
+                                        color: Colors.black,
+                                        width: 0.8,
+                                      ),
+                                    ),
+                                    // color: Colors.grey[50],
+                                    color: Colors.white,
+                                  ),
+                                  child: Row(
                                     children: [
-                                      Row(
-                                        // mainAxisAlignment:
-                                        // MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Container(
-                                            width: 170,
-                                            padding: EdgeInsets.only(
-                                              left: 10,
-                                              top: 5,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              border: Border(
-                                                right: BorderSide(
-                                                  color: Colors.black,
-                                                  width: 0.8,
-                                                ),
-                                              ),
-                                              // color: Colors.green[50],
-                                              // color: Colors.green[100],
-                                            ),
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
+                                      Expanded(
+                                        child: ListView(
+                                          scrollDirection: Axis.horizontal,
+
+                                          children: [
+                                            Row(
+                                              // mainAxisAlignment:
+                                              // MainAxisAlignment.spaceBetween,
                                               children: [
-                                                Row(
-                                                  children: [
-                                                    Text(
-                                                      "${w.periode} #${w.nber}, ",
-                                                      style: const TextStyle(
-                                                        fontSize: 14,
-                                                        fontWeight:
-                                                            FontWeight.bold,
+                                                Container(
+                                                  width: 170,
+                                                  padding: EdgeInsets.only(
+                                                    left: 10,
+                                                    top: 5,
+                                                  ),
+                                                  decoration: BoxDecoration(
+                                                    border: Border(
+                                                      right: BorderSide(
                                                         color: Colors.black,
-                                                        // letterSpacing: 1.2,
-                                                        // fontStyle: FontStyle.italic,
+                                                        width: 0.8,
                                                       ),
                                                     ),
-                                                    isQuinzaineActive(w)
-                                                        ? Text(
-                                                            "En cours",
-                                                            style: TextStyle(
-                                                              // color: Colors.blue,
-                                                              color: Color(
-                                                                0xFF0D47A1,
-                                                              ),
-                                                              fontSize: 12,
-                                                              fontStyle:
-                                                                  FontStyle
-                                                                      .italic,
-                                                            ),
-                                                          )
-                                                        : Text(
-                                                            "Terminé",
-                                                            style: TextStyle(
+                                                    // color: Colors.green[50],
+                                                    // color: Colors.green[100],
+                                                  ),
+                                                  child: Column(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
+                                                    children: [
+                                                      Row(
+                                                        children: [
+                                                          Text(
+                                                            "${w.periode} #${w.nber}, ",
+                                                            style: const TextStyle(
+                                                              fontSize: 14,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold,
                                                               color:
-                                                                  Colors.orange,
-                                                              fontSize: 12,
-                                                              fontStyle:
-                                                                  FontStyle
-                                                                      .italic,
+                                                                  Colors.black,
+                                                              // letterSpacing: 1.2,
+                                                              // fontStyle: FontStyle.italic,
                                                             ),
                                                           ),
-                                                  ],
-                                                ),
+                                                          isQuinzaineActive(w)
+                                                              ? Text(
+                                                                  "En cours",
+                                                                  style: TextStyle(
+                                                                    // color: Colors.blue,
+                                                                    color: Color(
+                                                                      0xFF0D47A1,
+                                                                    ),
+                                                                    fontSize:
+                                                                        12,
+                                                                    fontStyle:
+                                                                        FontStyle
+                                                                            .italic,
+                                                                  ),
+                                                                )
+                                                              : Text(
+                                                                  "Terminé",
+                                                                  style: TextStyle(
+                                                                    color: Colors
+                                                                        .orange,
+                                                                    fontSize:
+                                                                        12,
+                                                                    fontStyle:
+                                                                        FontStyle
+                                                                            .italic,
+                                                                  ),
+                                                                ),
+                                                        ],
+                                                      ),
 
-                                                Text(
-                                                  "${w.debut} au ${w.fin}",
-                                                  style: TextStyle(
-                                                    fontSize: 10,
-                                                    fontStyle: FontStyle.italic,
+                                                      Text(
+                                                        "${w.debut} au ${w.fin}",
+                                                        style: TextStyle(
+                                                          fontSize: 10,
+                                                          fontStyle:
+                                                              FontStyle.italic,
+                                                        ),
+                                                      ),
+                                                      Text(
+                                                        "Créer le ${w.dateCreate}",
+                                                        style: TextStyle(
+                                                          fontSize: 10,
+                                                          fontStyle:
+                                                              FontStyle.italic,
+                                                        ),
+                                                      ),
+                                                      Text(
+                                                        "Dépenses: ${w.ttal} f",
+                                                        style: TextStyle(
+                                                          fontSize: 10,
+                                                          fontStyle:
+                                                              FontStyle.italic,
+                                                        ),
+                                                      ),
+                                                    ],
                                                   ),
                                                 ),
-                                                Text(
-                                                  "Créer le ${w.dateCreate}",
-                                                  style: TextStyle(
-                                                    fontSize: 10,
-                                                    fontStyle: FontStyle.italic,
-                                                  ),
-                                                ),
-                                                Text(
-                                                  "Dépenses: ${w.ttal} f",
-                                                  style: TextStyle(
-                                                    fontSize: 10,
-                                                    fontStyle: FontStyle.italic,
-                                                  ),
+                                                Row(
+                                                  children: [
+                                                    TextButton.icon(
+                                                      onPressed: () {
+                                                        Navigator.push(
+                                                          context,
+                                                          MaterialPageRoute(
+                                                            builder: (context) =>
+                                                                QuinzaineScreen(
+                                                                  quinzaine: w,
+                                                                  pwds: pwd_,
+                                                                  typeUser: widget
+                                                                      .typeUser,
+                                                                  pwdUser: widget
+                                                                      .pwdUser,
+                                                                  statutProjet:
+                                                                      widget
+                                                                          .projet
+                                                                          .statut,
+                                                                ),
+                                                          ),
+                                                        );
+                                                      },
+                                                      label: Icon(
+                                                        Icons
+                                                            .remove_red_eye_outlined,
+                                                        size: 25,
+                                                        color: Colors.green,
+                                                      ),
+                                                    ),
+                                                    TextButton.icon(
+                                                      onPressed: () {
+                                                        _onEdit(w);
+                                                      },
+
+                                                      label: Icon(
+                                                        Icons.edit_square,
+                                                        size: 25,
+                                                        color: Colors.green,
+                                                      ),
+                                                    ),
+                                                    TextButton.icon(
+                                                      onPressed: () {
+                                                        _onDelete(w);
+                                                      },
+                                                      label: Icon(
+                                                        Icons.delete_forever,
+                                                        size: 25,
+                                                        color: Colors.red,
+                                                      ),
+                                                    ),
+                                                  ],
                                                 ),
                                               ],
                                             ),
-                                          ),
-                                          Row(
-                                            children: [
-                                              TextButton.icon(
-                                                onPressed: () {
-                                                  Navigator.push(
-                                                    context,
-                                                    MaterialPageRoute(
-                                                      builder: (context) =>
-                                                          QuinzaineScreen(
-                                                            quinzaine: w,
-                                                            pwds: pwd_,
-                                                          ),
-                                                    ),
-                                                  );
-                                                },
-                                                label: Icon(
-                                                  Icons.remove_red_eye_outlined,
-                                                  size: 25,
-                                                  color: Colors.green,
-                                                ),
-                                              ),
-                                              TextButton.icon(
-                                                onPressed: () {
-                                                  _onEdit(w);
-                                                },
-
-                                                label: Icon(
-                                                  Icons.edit,
-                                                  size: 25,
-                                                  color: Colors.green,
-                                                ),
-                                              ),
-
-                                              TextButton.icon(
-                                                onPressed: () {
-                                                  _onDelete(w);
-                                                },
-                                                label: Icon(
-                                                  Icons.delete_forever,
-                                                  size: 25,
-                                                  color: Colors.red,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
+                                          ],
+                                        ),
                                       ),
                                     ],
                                   ),
-                                ),
-                              ],
+                                );
+                              },
                             ),
-                          );
-                        },
-                      ),
-                    ),
+                          ),
                   ],
                 ),
               ),

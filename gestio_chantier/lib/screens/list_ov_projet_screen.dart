@@ -8,7 +8,19 @@ import '../config/conn_backend.dart';
 
 class PageOuvrierProjet extends StatefulWidget {
   final String idProjet;
-  const PageOuvrierProjet({super.key, required this.idProjet});
+  final List pwd;
+  final String typeUser;
+  final String pwdUser;
+  final String statut;
+
+  const PageOuvrierProjet({
+    super.key,
+    required this.idProjet,
+    required this.pwd,
+    required this.typeUser,
+    required this.pwdUser,
+    required this.statut,
+  });
   @override
   State<PageOuvrierProjet> createState() => _PageOuvrierProjetState();
 }
@@ -17,12 +29,14 @@ class _PageOuvrierProjetState extends State<PageOuvrierProjet> {
   List<Worker> _workers = [];
   bool _isLoading = true;
   int _ttalOvProjet = 0;
+  late List pwd_;
 
   Uri connUrl_ = ConnBackend.connUrl;
 
   @override
   void initState() {
     super.initState();
+    pwd_ = widget.pwd;
     _loadWorkers();
   }
 
@@ -41,39 +55,6 @@ class _PageOuvrierProjetState extends State<PageOuvrierProjet> {
     });
   }
 
-  Future<void> _confirmAdminAction({required VoidCallback onConfirmed}) async {
-    final ctrl = TextEditingController();
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Confirmation admin'),
-        content: TextField(
-          controller: ctrl,
-          obscureText: true,
-          decoration: const InputDecoration(labelText: 'Mot de passe admin'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Annuler'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, ctrl.text == 'admin123'),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true) {
-      onConfirmed();
-    } else if (confirmed == false) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Mot de passe incorrect')));
-    }
-  }
-
   Future<void> _deleteWorker(int id) async {
     final reponse = await http.post(
       connUrl_,
@@ -81,46 +62,179 @@ class _PageOuvrierProjetState extends State<PageOuvrierProjet> {
       body: jsonEncode({"action": "delete_ov", 'id': id.toString()}),
     );
     final reponseData = jsonDecode(reponse.body);
-    if (!mounted) return;
-    showDialog(
+
+    if (reponseData['success'] == true) {
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('Info'),
+          content: Text(reponseData['message']),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      setState(() {
+        _workers.removeWhere((w) => w.id == id);
+        _ttalOvProjet = _workers.length;
+      });
+    }
+  }
+
+  void _onDelete(Worker w) {
+    _confirmSpAdmin(onConfirmed: () => _deleteWorker(w.id));
+  }
+
+  void _onEdit(Worker w) {
+    _confirmAdmins(
+      onConfirmed: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => WorkerEditPage(worker: w)),
+        );
+      },
+    );
+  }
+
+  Future<void> _confirmSpAdmin({required VoidCallback onConfirmed}) async {
+    final ctrl = TextEditingController();
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Info'),
-        content: Text(reponseData['message']),
+        title: const Text('Mdp admins'),
+        content: TextField(
+          controller: ctrl,
+          obscureText: true,
+          decoration: const InputDecoration(
+            labelText: 'Mot de passe admin ici ...',
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () {
+              if (ctrl.text == pwd_[1] || ctrl.text == pwd_[2]) {
+                Navigator.pop(context, true);
+              } else if (ctrl.text == "") {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Le champ ne doit pas etre vide !'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              } else {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Mot de passe incorrect'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            // onPressed: () => Navigator.pop(context, ctrl.text == 'admin123'),
             child: const Text('OK'),
           ),
         ],
       ),
     );
-    _loadWorkers();
+
+    if (confirmed == true) {
+      onConfirmed();
+    }
   }
 
-  void _onDelete(Worker w) {
-    _confirmAdminAction(onConfirmed: () => _deleteWorker(w.id));
-  }
-
-  void _onEdit(Worker w) {
-    _confirmAdminAction(
-      onConfirmed: () {
-        // Redirection vers un formulaire pré-rempli d'édition
-        // Ici tu pourras injecter 'w' dans le formulaire de modification.
-
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => WorkerEditPage(worker: w)),
-        );
-
-        // if (!mounted) return;
-        // ScaffoldMessenger.of(context).showSnackBar(
-        //   const SnackBar(
-        //     content: Text("Modifier l'ouvrier Zorobi (implémenter formulaire)"),
-        //   ),
-        // );
-      },
+  Future<void> _confirmAdmins({required VoidCallback onConfirmed}) async {
+    final ctrl = TextEditingController();
+    // bool verify = false;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Saisi Mdp'),
+        content: TextField(
+          controller: ctrl,
+          obscureText: true,
+          decoration: const InputDecoration(labelText: 'Mot de passe ici ...'),
+        ),
+        actions: [
+          TextButton(
+            // onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () {
+              if (ctrl.text == "") {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Le champ ne doit pas etre vide !',
+                      // style: TextStyle(color: Colors.red),
+                    ),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              } else if (widget.typeUser == 'bureau') {
+                if (ctrl.text == pwd_[1] || ctrl.text == pwd_[2]) {
+                  Navigator.pop(context, true);
+                } else {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Mot de passe incorrect',
+                        // style: TextStyle(color: Colors.red),
+                      ),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              } else if (widget.typeUser == 'chantier') {
+                if (ctrl.text == widget.pwdUser) {
+                  Navigator.pop(context, true);
+                } else if (widget.pwdUser == '') {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Une erreur inconnue est survenue !',
+                        // style: TextStyle(color: Colors.red),
+                      ),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                } else {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Mot de passe incorrect',
+                        // style: TextStyle(color: Colors.red),
+                      ),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('OK'),
+          ),
+        ],
+      ),
     );
+
+    if (confirmed == true) {
+      onConfirmed();
+    }
   }
 
   @override
@@ -157,8 +271,9 @@ class _PageOuvrierProjetState extends State<PageOuvrierProjet> {
                       ),
                     ),
                     SizedBox(height: 20),
+
                     Expanded(
-                      child: ListView.builder(
+                      child: ListView.separated(
                         itemCount: _workers.length,
                         itemBuilder: (_, i) {
                           final w = _workers[i];
@@ -171,23 +286,49 @@ class _PageOuvrierProjetState extends State<PageOuvrierProjet> {
                                 fit: BoxFit.cover,
                               ),
                             ),
-                            title: Text(w.name),
-                            subtitle: Text('${w.function} • ${w.phone}'),
+                            title: Text(
+                              w.name,
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            subtitle: Text('${w.function}\n${w.phone}'),
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 IconButton(
-                                  icon: const Icon(Icons.edit),
-                                  onPressed: () => _onEdit(w),
+                                  // color: Colors.green,
+                                  icon: const Icon(Icons.edit_square),
+                                  onPressed: () {
+                                    if (widget.statut == 'Terminé') {
+                                      // if (!mounted) return;
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Impossible, le projet est terminé',
+                                            // style: TextStyle(color: Colors.red),
+                                          ),
+                                          backgroundColor: Colors.red,
+                                        ),
+                                      );
+                                    } else {
+                                      _onEdit(w);
+                                    }
+                                  },
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.delete),
+                                  // color: Colors.red,
+                                  icon: const Icon(
+                                    Icons.delete_forever_rounded,
+                                  ),
                                   onPressed: () => _onDelete(w),
                                 ),
                               ],
                             ),
                           );
                         },
+                        separatorBuilder: (BuildContext context, i) =>
+                            Divider(),
                       ),
                     ),
                   ],

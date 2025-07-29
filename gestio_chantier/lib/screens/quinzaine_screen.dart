@@ -22,11 +22,17 @@ import '../config/internet_verify.dart';
 class QuinzaineScreen extends StatefulWidget {
   final Quinzaine quinzaine;
   final List pwds;
+  final String typeUser;
+  final String pwdUser;
+  final String statutProjet;
 
   const QuinzaineScreen({
     super.key,
     required this.quinzaine,
     required this.pwds,
+    required this.typeUser,
+    required this.pwdUser,
+    required this.statutProjet,
   });
 
   @override
@@ -38,12 +44,14 @@ class QuinzaineScreenState extends State<QuinzaineScreen> {
   List<WorkersQuinzaine> _workers = [];
   bool _isLoading = true;
   late int ttalouvier = 0;
+  late List pwd_;
 
   Uri connUrl_ = ConnBackend.connUrl;
 
   @override
   void initState() {
     super.initState();
+    pwd_ = widget.pwds;
     _loadWorkers();
   }
 
@@ -76,20 +84,6 @@ class QuinzaineScreenState extends State<QuinzaineScreen> {
       final reponseData = jsonDecode(reponse.body);
 
       if (reponseData['success'] == true) {
-        if (!mounted) return;
-        showDialog(
-          context: context,
-          builder: (_) => AlertDialog(
-            title: const Text('Info'),
-            content: Text(reponseData['message']),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('OK'),
-              ),
-            ],
-          ),
-        );
         setState(() {
           _workers.removeWhere((ouvr) => ouvr.id == id);
           ttalouvier = _workers.length;
@@ -291,11 +285,10 @@ class QuinzaineScreenState extends State<QuinzaineScreen> {
 
   Future<void> _confirmAdm({required VoidCallback onConfirmed}) async {
     final ctrl = TextEditingController();
-    // bool verify = false;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Mdp adm'),
+        title: const Text('Mdp admins'),
         content: TextField(
           controller: ctrl,
           obscureText: true,
@@ -305,24 +298,18 @@ class QuinzaineScreenState extends State<QuinzaineScreen> {
         ),
         actions: [
           TextButton(
-            // onPressed: () => Navigator.pop(context, false),
             onPressed: () => Navigator.pop(context),
             child: const Text('Annuler'),
           ),
           TextButton(
             onPressed: () {
-              if (ctrl.text == widget.pwds[1] || ctrl.text == widget.pwds[2]
-              // ctrl.text == widget.pwds[0]
-              ) {
+              if (ctrl.text == pwd_[1] || ctrl.text == pwd_[2]) {
                 Navigator.pop(context, true);
               } else if (ctrl.text == "") {
                 if (!mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text(
-                      'Le champ ne doit pas etre vide !',
-                      // style: TextStyle(color: Colors.red),
-                    ),
+                    content: Text('Le champ ne doit pas etre vide !'),
                     backgroundColor: Colors.red,
                   ),
                 );
@@ -330,10 +317,7 @@ class QuinzaineScreenState extends State<QuinzaineScreen> {
                 if (!mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text(
-                      'Mot de passe incorrect',
-                      // style: TextStyle(color: Colors.red),
-                    ),
+                    content: Text('Mot de passe incorrect'),
                     backgroundColor: Colors.red,
                   ),
                 );
@@ -357,13 +341,11 @@ class QuinzaineScreenState extends State<QuinzaineScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Mdp admins'),
+        title: const Text('Saisi Mdp'),
         content: TextField(
           controller: ctrl,
           obscureText: true,
-          decoration: const InputDecoration(
-            labelText: 'Mot de passe admin ici ...',
-          ),
+          decoration: const InputDecoration(labelText: 'Mot de passe ici ...'),
         ),
         actions: [
           TextButton(
@@ -373,11 +355,7 @@ class QuinzaineScreenState extends State<QuinzaineScreen> {
           ),
           TextButton(
             onPressed: () {
-              if (ctrl.text == widget.pwds[1] ||
-                  ctrl.text == widget.pwds[2] ||
-                  ctrl.text == widget.pwds[0]) {
-                Navigator.pop(context, true);
-              } else if (ctrl.text == "") {
+              if (ctrl.text == "") {
                 if (!mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
@@ -388,20 +366,49 @@ class QuinzaineScreenState extends State<QuinzaineScreen> {
                     backgroundColor: Colors.red,
                   ),
                 );
-              } else {
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'Mot de passe incorrect',
-                      // style: TextStyle(color: Colors.red),
+              } else if (widget.typeUser == 'bureau') {
+                if (ctrl.text == pwd_[1] || ctrl.text == pwd_[2]) {
+                  Navigator.pop(context, true);
+                } else {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Mot de passe incorrect',
+                        // style: TextStyle(color: Colors.red),
+                      ),
+                      backgroundColor: Colors.red,
                     ),
-                    backgroundColor: Colors.red,
-                  ),
-                );
+                  );
+                }
+              } else if (widget.typeUser == 'chantier') {
+                if (ctrl.text == widget.pwdUser) {
+                  Navigator.pop(context, true);
+                } else if (widget.pwdUser == '') {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Une erreur inconnue est survenue !',
+                        // style: TextStyle(color: Colors.red),
+                      ),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                } else {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Mot de passe incorrect',
+                        // style: TextStyle(color: Colors.red),
+                      ),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
               }
             },
-            // onPressed: () => Navigator.pop(context, ctrl.text == 'admin123'),
             child: const Text('OK'),
           ),
         ],
@@ -543,21 +550,36 @@ class QuinzaineScreenState extends State<QuinzaineScreen> {
                         children: [
                           GestureDetector(
                             onTap: () {
-                              String verifiAction = controlAction();
-                              if (verifiAction == '0') {
-                                _showDialogMessage(
-                                  "La session n'a pas encore commencé !",
-                                );
-                              } else if (verifiAction == '1') {
-                                _showDialogMessage("La session est terminée !");
-                              } else if (verifiAction == '11') {
-                                _confirmAdmins(
-                                  onConfirmed: () {
-                                    _optionAddOvQuinzaine();
-                                  },
+                              if (widget.statutProjet == 'Terminé') {
+                                // if (!mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Impossible, le projet est terminé',
+                                      // style: TextStyle(color: Colors.red),
+                                    ),
+                                    backgroundColor: Colors.red,
+                                  ),
                                 );
                               } else {
-                                _showDialogMessage(verifiAction);
+                                String verifiAction = controlAction();
+                                if (verifiAction == '0') {
+                                  _showDialogMessage(
+                                    "La session n'a pas encore commencé !",
+                                  );
+                                } else if (verifiAction == '1') {
+                                  _showDialogMessage(
+                                    "La session est terminée !",
+                                  );
+                                } else if (verifiAction == '11') {
+                                  _confirmAdmins(
+                                    onConfirmed: () {
+                                      _optionAddOvQuinzaine();
+                                    },
+                                  );
+                                } else {
+                                  _showDialogMessage(verifiAction);
+                                }
                               }
                             },
                             child: const Column(
@@ -581,31 +603,46 @@ class QuinzaineScreenState extends State<QuinzaineScreen> {
 
                           GestureDetector(
                             onTap: () {
-                              // Action quand on clique sur le tout
-                              String verifiAction = controlAction();
-                              if (verifiAction == '0') {
-                                _showDialogMessage(
-                                  "La session n'a pas encore commencé !",
-                                );
-                              } else if (verifiAction == '1') {
-                                _showDialogMessage("La session est terminée !");
-                              } else if (verifiAction == '11') {
-                                _confirmAdmins(
-                                  onConfirmed: () {
-                                    _optionPointage();
-                                    // Navigator.push(
-                                    //   context,
-                                    //   MaterialPageRoute(
-                                    //     builder: (context) =>
-                                    //         PageOuvrierPointage(
-                                    //           q: widget.quinzaine,
-                                    //         ),
-                                    //   ),
-                                    // );
-                                  },
+                              if (widget.statutProjet == 'Terminé') {
+                                // if (!mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Impossible, le projet est terminé',
+                                      // style: TextStyle(color: Colors.red),
+                                    ),
+                                    backgroundColor: Colors.red,
+                                  ),
                                 );
                               } else {
-                                _showDialogMessage(verifiAction);
+                                // Action quand on clique sur le tout
+                                String verifiAction = controlAction();
+                                if (verifiAction == '0') {
+                                  _showDialogMessage(
+                                    "La session n'a pas encore commencé !",
+                                  );
+                                } else if (verifiAction == '1') {
+                                  _showDialogMessage(
+                                    "La session est terminée !",
+                                  );
+                                } else if (verifiAction == '11') {
+                                  _confirmAdmins(
+                                    onConfirmed: () {
+                                      _optionPointage();
+                                      // Navigator.push(
+                                      //   context,
+                                      //   MaterialPageRoute(
+                                      //     builder: (context) =>
+                                      //         PageOuvrierPointage(
+                                      //           q: widget.quinzaine,
+                                      //         ),
+                                      //   ),
+                                      // );
+                                    },
+                                  );
+                                } else {
+                                  _showDialogMessage(verifiAction);
+                                }
                               }
                             },
                             child: const Column(
@@ -804,187 +841,225 @@ class QuinzaineScreenState extends State<QuinzaineScreen> {
                         ),
                       ),
                     ),
+
                     // Liste scrollable
-                    Expanded(
-                      child: ListView.builder(
-                        itemCount: _workers.length,
-                        itemBuilder: (_, i) {
-                          final w = _workers[i];
-                          return Column(
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Container(
-                                    // height: 48,
-                                    // margin: EdgeInsets.symmetric(vertical: 10, horizontal: 0),
-                                    // alignment: Alignment.sp,
-                                    padding: EdgeInsets.symmetric(
-                                      vertical: 5,
-                                      horizontal: 5,
-                                    ),
-                                    width:
-                                        MediaQuery.of(context).size.width *
-                                        0.97,
-                                    decoration: BoxDecoration(
-                                      border: Border(
-                                        bottom: BorderSide(
-                                          color: Colors.black,
-                                          width: 0.8,
-                                        ),
-                                      ),
-                                      color: Colors.white60,
-                                    ),
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment
-                                          .spaceEvenly, // 👈 ici le spacing !
+                    _workers.isEmpty
+                        ? Container(
+                            alignment: Alignment.center,
+                            padding: EdgeInsets.all(20),
+                            color: Colors.white,
+                            child: Text(
+                              "Aucun ouvrier enregistré pour cette session.",
+                            ),
+                          )
+                        : Expanded(
+                            child: ListView.builder(
+                              itemCount: _workers.length,
+                              itemBuilder: (_, i) {
+                                final w = _workers[i];
+                                return Column(
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: [
                                         Container(
+                                          // height: 48,
+                                          // margin: EdgeInsets.symmetric(vertical: 10, horizontal: 0),
+                                          // alignment: Alignment.sp,
+                                          padding: EdgeInsets.symmetric(
+                                            vertical: 5,
+                                            horizontal: 5,
+                                          ),
                                           width:
                                               MediaQuery.of(
                                                 context,
                                               ).size.width *
-                                              0.55,
-                                          padding: EdgeInsets.only(
-                                            top: 3,
-                                            right: 10,
-                                            left: 10,
-                                            bottom: 5,
-                                          ),
+                                              0.97,
                                           decoration: BoxDecoration(
                                             border: Border(
-                                              right: BorderSide(
+                                              bottom: BorderSide(
                                                 color: Colors.black,
                                                 width: 0.8,
                                               ),
                                             ),
-                                            // color: Colors.blue,
                                             color: Colors.white60,
                                           ),
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
+                                          child: Row(
+                                            mainAxisAlignment: MainAxisAlignment
+                                                .spaceEvenly, // 👈 ici le spacing !
                                             children: [
-                                              Row(
-                                                children: [
-                                                  Container(
-                                                    width: 60,
-                                                    height: 60,
-                                                    margin: EdgeInsets.only(
-                                                      right: 6,
-                                                    ),
-
-                                                    child: ClipRRect(
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                            30,
-                                                          ), // optionnel
-                                                      child: Image.memory(
-                                                        w.photo,
-                                                        width: 60,
-                                                        height: 60,
-                                                        fit: BoxFit.cover,
-                                                      ),
+                                              Container(
+                                                width:
+                                                    MediaQuery.of(
+                                                      context,
+                                                    ).size.width *
+                                                    0.55,
+                                                padding: EdgeInsets.only(
+                                                  top: 3,
+                                                  right: 10,
+                                                  left: 10,
+                                                  bottom: 5,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  border: Border(
+                                                    right: BorderSide(
+                                                      color: Colors.black,
+                                                      width: 0.8,
                                                     ),
                                                   ),
+                                                  // color: Colors.blue,
+                                                  color: Colors.white60,
+                                                ),
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Row(
+                                                      children: [
+                                                        Container(
+                                                          width: 60,
+                                                          height: 60,
+                                                          margin:
+                                                              EdgeInsets.only(
+                                                                right: 6,
+                                                              ),
 
-                                                  Column(
-                                                    crossAxisAlignment:
-                                                        CrossAxisAlignment
-                                                            .start,
-                                                    children: [
-                                                      Text(
-                                                        w.nom,
-                                                        style: TextStyle(
-                                                          fontSize: 10,
-                                                          fontWeight:
-                                                              FontWeight.bold,
-                                                          fontStyle:
-                                                              FontStyle.italic,
+                                                          child: ClipRRect(
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  30,
+                                                                ), // optionnel
+                                                            child: Image.memory(
+                                                              w.photo,
+                                                              width: 60,
+                                                              height: 60,
+                                                              fit: BoxFit.cover,
+                                                            ),
+                                                          ),
                                                         ),
-                                                      ),
-                                                      Text(
-                                                        "${w.fonction}\nPrix jr: ${formatNombreStr(w.prixJr)} f\nTel: ${w.tel}\nPointage: ${w.ttalJr} jr(s)\nPaie ttal: ${w.gainQuinzaine} f",
-                                                        style: TextStyle(
-                                                          fontSize: 8,
-                                                          fontStyle:
-                                                              FontStyle.italic,
+
+                                                        Column(
+                                                          crossAxisAlignment:
+                                                              CrossAxisAlignment
+                                                                  .start,
+                                                          children: [
+                                                            Text(
+                                                              w.nom,
+                                                              style: TextStyle(
+                                                                fontSize: 10,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold,
+                                                                fontStyle:
+                                                                    FontStyle
+                                                                        .italic,
+                                                              ),
+                                                            ),
+                                                            Text(
+                                                              "${w.fonction}\nPrix jr: ${formatNombreStr(w.prixJr)} f\nTel: ${w.tel}\nPointage: ${w.ttalJr} jr(s)\nPaie ttal: ${w.gainQuinzaine} f",
+                                                              style: TextStyle(
+                                                                fontSize: 8,
+                                                                fontStyle:
+                                                                    FontStyle
+                                                                        .italic,
+                                                              ),
+                                                            ),
+                                                            Text(
+                                                              "Payé: ${w.paiement} f, Reste: ${formatNombreStr(w.reste)}",
+                                                              style: TextStyle(
+                                                                fontSize: 8,
+                                                                fontStyle:
+                                                                    FontStyle
+                                                                        .italic,
+                                                              ),
+                                                            ),
+                                                            statutText(
+                                                              w.statut,
+                                                              w.ttalJr,
+                                                            ),
+                                                          ],
                                                         ),
+                                                      ],
+                                                    ),
+
+                                                    Text(
+                                                      "Ajouté le ${w.dateAdd}",
+                                                      style: TextStyle(
+                                                        fontSize: 10,
+                                                        // fontStyle: FontStyle.italic,
                                                       ),
-                                                      Text(
-                                                        "Payé: ${w.paiement} f, Reste: ${formatNombreStr(w.reste)}",
-                                                        style: TextStyle(
-                                                          fontSize: 8,
-                                                          fontStyle:
-                                                              FontStyle.italic,
-                                                        ),
-                                                      ),
-                                                      statutText(
-                                                        w.statut,
-                                                        w.ttalJr,
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ],
+                                                    ),
+                                                  ],
+                                                ),
                                               ),
 
-                                              Text(
-                                                "Ajouté le ${w.dateAdd}",
-                                                style: TextStyle(
-                                                  fontSize: 10,
-                                                  // fontStyle: FontStyle.italic,
-                                                ),
+                                              Row(
+                                                children: [
+                                                  TextButton.icon(
+                                                    onPressed: () {
+                                                      _onEdit(w);
+                                                    },
+
+                                                    label: Icon(
+                                                      Icons.edit_square,
+                                                      size: 27,
+                                                      color: Colors.green,
+                                                    ),
+                                                  ),
+
+                                                  TextButton.icon(
+                                                    onPressed: () {
+                                                      if (widget.statutProjet ==
+                                                          'Terminé') {
+                                                        // if (!mounted) return;
+                                                        ScaffoldMessenger.of(
+                                                          context,
+                                                        ).showSnackBar(
+                                                          const SnackBar(
+                                                            content: Text(
+                                                              'Impossible, le projet est terminé',
+                                                              // style: TextStyle(color: Colors.red),
+                                                            ),
+                                                            backgroundColor:
+                                                                Colors.red,
+                                                          ),
+                                                        );
+                                                      } else {
+                                                        _onDelete(
+                                                          w.ttalJr,
+                                                          w.id,
+                                                        );
+                                                      }
+                                                    },
+                                                    label: Icon(
+                                                      Icons.delete_forever,
+                                                      size: 27,
+                                                      color: Colors.red,
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
                                             ],
                                           ),
                                         ),
-
-                                        Row(
-                                          children: [
-                                            TextButton.icon(
-                                              onPressed: () {
-                                                _onEdit(w);
-                                              },
-
-                                              label: Icon(
-                                                Icons.edit_square,
-                                                size: 27,
-                                                color: Colors.green,
-                                              ),
-                                            ),
-
-                                            TextButton.icon(
-                                              onPressed: () {
-                                                _onDelete(w.ttalJr, w.id);
-                                              },
-                                              label: Icon(
-                                                Icons.delete_forever,
-                                                size: 27,
-                                                color: Colors.red,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
                                       ],
                                     ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          );
-                        },
-                      ),
+                                  ],
+                                );
+                              },
+                            ),
 
-                      // ListView(
-                      //   // padding: const EdgeInsets.all(),
-                      //   padding: const EdgeInsets.symmetric(
-                      //     horizontal: 3,
-                      //     vertical: 5,
-                      //   ),
+                            // ListView(
+                            //   // padding: const EdgeInsets.all(),
+                            //   padding: const EdgeInsets.symmetric(
+                            //     horizontal: 3,
+                            //     vertical: 5,
+                            //   ),
 
-                      //   children: [],
-                      // ),
-                    ),
+                            //   children: [],
+                            // ),
+                          ),
                   ],
                 ),
               ),

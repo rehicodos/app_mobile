@@ -16,11 +16,17 @@ import '../config/separe_millier.dart';
 class FeuilleSousTraitant extends StatefulWidget {
   final Projets projet;
   final String typeOffre;
+  final List pwd;
+  final String typeUser;
+  final String pwdUser;
 
   const FeuilleSousTraitant({
     super.key,
     required this.projet,
     required this.typeOffre,
+    required this.pwd,
+    required this.typeUser,
+    required this.pwdUser,
   });
 
   @override
@@ -33,6 +39,7 @@ class _FeuilleSousTraitantState extends State<FeuilleSousTraitant> {
   bool colonnesReduites = false;
   bool _hasSaved = false;
 
+  late List pwd_;
   String txtShow = '';
   String _typeOffre = '';
   String _ttle = '';
@@ -75,6 +82,7 @@ class _FeuilleSousTraitantState extends State<FeuilleSousTraitant> {
   @override
   void initState() {
     super.initState();
+    pwd_ = widget.pwd;
     _chargerSTraitant();
   }
 
@@ -194,12 +202,29 @@ class _FeuilleSousTraitantState extends State<FeuilleSousTraitant> {
                   _showMessage("Contrat terminé, le pourcentage est à 100%");
                 } else {
                   Navigator.of(context).pop();
-                  _realisationContrat(
-                    realiser: realiser,
-                    onConfirmed: () {
-                      _logiqRealisation(id, _realiser);
-                    },
-                  );
+                  if (widget.projet.statut == 'Terminé') {
+                    // if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Impossible, le projet est terminé',
+                          // style: TextStyle(color: Colors.red),
+                        ),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  } else {
+                    _confirmAdmins(
+                      onConfirmed: () {
+                        _realisationContrat(
+                          realiser: realiser,
+                          onConfirmed: () {
+                            _logiqRealisation(id, _realiser);
+                          },
+                        );
+                      },
+                    );
+                  }
                 }
                 // Navigator.of(context).pop();
                 // _navigateToAddOvQuinzaineListProjet();
@@ -218,12 +243,29 @@ class _FeuilleSousTraitantState extends State<FeuilleSousTraitant> {
                   _showMessage("Rien à solder, le contrat est soldé");
                 } else {
                   Navigator.of(context).pop();
-                  _versementContrat(
-                    ttalPaie: reste,
-                    onConfirmed: () {
-                      _logiqVersement(id, _montantPaie);
-                    },
-                  );
+                  if (widget.projet.statut == 'Terminé') {
+                    // if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Impossible, le projet est terminé',
+                          // style: TextStyle(color: Colors.red),
+                        ),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  } else {
+                    _confirmSpAdmin(
+                      onConfirmed: () {
+                        _versementContrat(
+                          ttalPaie: reste,
+                          onConfirmed: () {
+                            _logiqVersement(id, _montantPaie);
+                          },
+                        );
+                      },
+                    );
+                  }
                 }
                 // Navigator.of(context).pop();
                 // _navigateToAddOvQuinzaineListProjet();
@@ -238,7 +280,20 @@ class _FeuilleSousTraitantState extends State<FeuilleSousTraitant> {
             ElevatedButton.icon(
               onPressed: () {
                 Navigator.of(context).pop();
-                _navigateToEditeOffre(c);
+                if (widget.projet.statut == 'Terminé') {
+                  // if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Impossible, le projet est terminé',
+                        // style: TextStyle(color: Colors.red),
+                      ),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                } else {
+                  _confirmAdmins(onConfirmed: () => _navigateToEditeOffre(c));
+                }
               },
               icon: const Icon(Icons.edit_square),
               label: const Text("Modifier"),
@@ -250,8 +305,7 @@ class _FeuilleSousTraitantState extends State<FeuilleSousTraitant> {
             ElevatedButton.icon(
               onPressed: () {
                 Navigator.of(context).pop();
-                // _navigateToAddOvQuinzaineListProjet();
-                _deleteContrat(id);
+                _confirmSpAdmin(onConfirmed: () => _deleteContrat(id));
               },
               icon: const Icon(Icons.delete_forever_rounded),
               label: const Text("Supprimer"),
@@ -720,6 +774,143 @@ class _FeuilleSousTraitantState extends State<FeuilleSousTraitant> {
     }
   }
 
+  Future<void> _confirmSpAdmin({required VoidCallback onConfirmed}) async {
+    final ctrl = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Mdp admins'),
+        content: TextField(
+          controller: ctrl,
+          obscureText: true,
+          decoration: const InputDecoration(
+            labelText: 'Mot de passe admin ici ...',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () {
+              if (ctrl.text == pwd_[1] || ctrl.text == pwd_[2]) {
+                Navigator.pop(context, true);
+              } else if (ctrl.text == "") {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Le champ ne doit pas etre vide !'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              } else {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Mot de passe incorrect'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            // onPressed: () => Navigator.pop(context, ctrl.text == 'admin123'),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      onConfirmed();
+    }
+  }
+
+  Future<void> _confirmAdmins({required VoidCallback onConfirmed}) async {
+    final ctrl = TextEditingController();
+    // bool verify = false;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Saisi Mdp'),
+        content: TextField(
+          controller: ctrl,
+          obscureText: true,
+          decoration: const InputDecoration(labelText: 'Mot de passe ici ...'),
+        ),
+        actions: [
+          TextButton(
+            // onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () {
+              if (ctrl.text == "") {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Le champ ne doit pas etre vide !',
+                      // style: TextStyle(color: Colors.red),
+                    ),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              } else if (widget.typeUser == 'bureau') {
+                if (ctrl.text == pwd_[1] || ctrl.text == pwd_[2]) {
+                  Navigator.pop(context, true);
+                } else {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Mot de passe incorrect',
+                        // style: TextStyle(color: Colors.red),
+                      ),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              } else if (widget.typeUser == 'chantier') {
+                if (ctrl.text == widget.pwdUser) {
+                  Navigator.pop(context, true);
+                } else if (widget.pwdUser == '') {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Une erreur inconnue est survenue !',
+                        // style: TextStyle(color: Colors.red),
+                      ),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                } else {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Mot de passe incorrect',
+                        // style: TextStyle(color: Colors.red),
+                      ),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      onConfirmed();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -737,7 +928,22 @@ class _FeuilleSousTraitantState extends State<FeuilleSousTraitant> {
             actions: [
               IconButton(
                 icon: Icon(Icons.add_circle_rounded),
-                onPressed: () => _navigateToNewOffre(),
+                onPressed: () {
+                  if (widget.projet.statut == 'Terminé') {
+                    // if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Impossible, le projet est terminé',
+                          // style: TextStyle(color: Colors.red),
+                        ),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  } else {
+                    _confirmAdmins(onConfirmed: () => _navigateToNewOffre());
+                  }
+                },
               ),
             ],
           ),

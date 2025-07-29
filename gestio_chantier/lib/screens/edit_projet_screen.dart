@@ -112,9 +112,6 @@ class EditProjetState extends State<EditProjet> {
         if (!mounted) return;
         if (data['success'] == true) {
           _showNoInternetDialog(context, msg: data['message']);
-          _nomController.clear();
-          _bdgMoController.clear();
-          _clientController.clear();
         } else {
           _showErrorDialog(context, msg: data['message']);
         }
@@ -149,8 +146,7 @@ class EditProjetState extends State<EditProjet> {
         child: Scaffold(
           appBar: AppBar(
             title: const Text("Modification projet"),
-            // backgroundColor: Colors.blueAccent,
-            backgroundColor: Colors.blue[200],
+            centerTitle: true,
           ),
           body: SingleChildScrollView(
             child: Form(
@@ -163,7 +159,7 @@ class EditProjetState extends State<EditProjet> {
                       "Renseignez les champs",
                       style: TextStyle(
                         fontSize: 20,
-                        color: Colors.blue,
+                        // color: Colors.blue,
                         fontWeight: FontWeight.bold,
                         // fontStyle: FontStyle.italic,
                       ),
@@ -219,8 +215,8 @@ class EditProjetState extends State<EditProjet> {
                     isLoading
                         ? const CircularProgressIndicator()
                         : ElevatedButton.icon(
-                            icon: const Icon(Icons.send_and_archive),
-                            label: const Text("Enregistrer"),
+                            icon: const Icon(Icons.edit_square),
+                            label: const Text("Modifier"),
                             onPressed: _enregistrer,
                           ),
                   ],
